@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 
+from app.api.router import api_router
+
+
 app = FastAPI(
     title="RepoPilot API",
     description="AI Software Engineer Agent",
@@ -7,12 +10,7 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-async def root():
-    return {
-        "name": "RepoPilot",
-        "status": "running",
-    }
+app.include_router(api_router)
 
 
 @app.get("/health")
