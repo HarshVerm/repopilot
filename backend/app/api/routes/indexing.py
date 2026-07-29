@@ -24,6 +24,17 @@ from app.schemas.indexing import (
 from app.services.indexing.indexer import (
     index_repository,
 )
+from app.services.tasks.failures import (
+    INDEXING_ERROR,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    INDEXED,
+    INDEXING,
+    TaskTransitionError,
+)
 
 router = APIRouter(
     prefix="/index",
@@ -77,11 +88,73 @@ async def create_index(
             detail="Workspace not found",
         )
 
-    result = await index_repository(
+    task_service = TaskService()
+    task = await task_service.find_task_by_workspace(
         workspace_id=str(workspace_id),
-        repository_path=repository_path,
         db=db,
     )
+
+    try:
+        if task is not None:
+            try:
+                await task_service.transition_task(
+                    task_id=task.id,
+                    new_status=INDEXING,
+                    db=db,
+                    event_type="indexing.started",
+                    metadata={
+                        "workspace_id": str(
+                            workspace_id
+                        )
+                    },
+                )
+            except TaskTransitionError:
+                await task_service.record_event(
+                    task_id=task.id,
+                    event_type="indexing.started",
+                    db=db,
+                    metadata={
+                        "workspace_id": str(
+                            workspace_id
+                        ),
+                        "status": task.status,
+                    },
+                    commit=True,
+                )
+
+        result = await index_repository(
+            workspace_id=str(workspace_id),
+            repository_path=repository_path,
+            db=db,
+        )
+
+        if task is not None:
+            try:
+                await task_service.transition_task(
+                    task_id=task.id,
+                    new_status=INDEXED,
+                    db=db,
+                    event_type="indexing.completed",
+                    metadata=result,
+                )
+            except TaskTransitionError:
+                await task_service.record_event(
+                    task_id=task.id,
+                    event_type="indexing.completed",
+                    db=db,
+                    metadata=result,
+                    commit=True,
+                )
+    except Exception as exc:
+        if task is not None:
+            await task_service.set_failure(
+                task_id=task.id,
+                db=db,
+                failure_category=INDEXING_ERROR,
+                error=exc,
+                event_type="indexing.failed",
+            )
+        raise
 
     return {
         "workspace_id": str(workspace_id),

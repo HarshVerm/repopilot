@@ -43,6 +43,15 @@ class DebugAttempt(Base):
         index=True,
     )
 
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "repo_pilot_tasks.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
     plan_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(
             "execution_plans.id",

@@ -24,6 +24,12 @@ from app.services.sandbox.policy import (
     InvalidChangeSetStateError,
     WorkspaceStateMismatchError,
 )
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
+)
+from app.services.tasks.locking import (
+    TaskOperationConflict,
+)
 
 
 router = APIRouter(
@@ -38,6 +44,13 @@ def get_sandbox_runtime():
 @router.post(
     "/change-sets/{change_set_id}/execute",
     response_model=ExecutionRunResponse,
+    dependencies=[
+        Depends(
+            enforce_rate_limit(
+                "sandbox"
+            )
+        )
+    ],
 )
 async def execute_change_set(
     change_set_id: UUID,
@@ -77,6 +90,11 @@ async def execute_change_set(
             detail=str(exc),
         ) from exc
     except WorkspaceStateMismatchError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+    except TaskOperationConflict as exc:
         raise HTTPException(
             status_code=409,
             detail=str(exc),

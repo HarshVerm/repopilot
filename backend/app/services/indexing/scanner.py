@@ -3,10 +3,11 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.core.config import settings
 from app.services.indexing.languages import detect_language
 
 
-MAX_FILE_SIZE = 1_000_000
+MAX_FILE_SIZE = settings.max_repository_file_size
 
 IGNORED_DIRECTORIES = {
     ".git",
@@ -26,6 +27,10 @@ class SourceFile:
     absolute_path: Path
     language: str
     size_bytes: int
+
+
+class RepositoryLimitError(RuntimeError):
+    pass
 
 
 def calculate_sha256(content: bytes) -> str:
@@ -77,11 +82,20 @@ def scan_repository(
     )
 
     files: list[SourceFile] = []
+    tracked_file_count = 0
+    tracked_total_bytes = 0
 
     for relative_path in relative_paths:
 
         if not relative_path:
             continue
+
+        tracked_file_count += 1
+
+        if tracked_file_count > settings.max_repository_files:
+            raise RepositoryLimitError(
+                "repository file count exceeds configured limit"
+            )
 
         relative_file_path = Path(relative_path)
 
@@ -113,6 +127,14 @@ def scan_repository(
         if not resolved_path.is_file():
             continue
 
+        size = resolved_path.stat().st_size
+        tracked_total_bytes += size
+
+        if tracked_total_bytes > settings.max_repository_bytes:
+            raise RepositoryLimitError(
+                "repository byte size exceeds configured limit"
+            )
+
         language = detect_language(
             relative_file_path
         )
@@ -120,10 +142,10 @@ def scan_repository(
         if not language:
             continue
 
-        size = resolved_path.stat().st_size
-
         if size > MAX_FILE_SIZE:
-            continue
+            raise RepositoryLimitError(
+                "source file size exceeds configured limit"
+            )
 
         # Avoid generated/minified JS
         if resolved_path.name.endswith(

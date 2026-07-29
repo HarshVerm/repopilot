@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "backend/tests/test_hidden_eval.py",
+      "content": "from pathlib import Path\n\n\ndef test_use_debounce_reacts_to_value_changes():\n    source = Path('src/hooks/useDebounce.ts').read_text().replace(' ', '')\n    assert '[value,delayMs]' in source\n"
+    }
+  ],
+  "commands": [
+    {
+      "name": "hidden:hook-dependencies",
+      "command_type": "test",
+      "executable": "python",
+      "args": ["backend/tests/test_hidden_eval.py"],
+      "timeout_seconds": 120,
+      "network_enabled": false,
+      "runtime": "python"
+    }
+  ]
+}

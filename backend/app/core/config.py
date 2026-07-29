@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+asyncpg://repopilot:repopilot@localhost:5432/repopilot"
     )
+    database_pool_size: int = 5
+    database_max_overflow: int = 5
+    database_pool_timeout_seconds: int = 30
+    database_pool_recycle_seconds: int = 1800
+    database_pool_pre_ping: bool = False
+
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
     embedding_batch_size: int = 32
@@ -58,6 +64,56 @@ class Settings(BaseSettings):
     max_chunk_tokens: int = 1200
     chunk_overlap_tokens: int = 100
     max_context_tokens: int = 6000
+    retrieval_top_k_default: int = 10
+    retrieval_top_k_max: int = 25
+    retrieval_query_max_chars: int = 4000
+
+    max_issue_title_chars: int = 300
+    max_issue_body_chars: int = 30_000
+    max_repository_files: int = 5000
+    max_repository_bytes: int = 250_000_000
+    max_indexed_files: int = 2500
+    max_code_chunks: int = 20_000
+    max_repository_file_size: int = 1_000_000
+    max_symbol_count: int = 25_000
+    max_task_event_metadata_bytes: int = 32_000
+
+    openai_timeout_seconds: float = 60.0
+    github_timeout_seconds: float = 15.0
+    github_connect_timeout_seconds: float = 5.0
+    http_max_connections: int = 20
+    http_max_keepalive_connections: int = 10
+    provider_max_retries: int = 3
+    provider_retry_initial_backoff_seconds: float = 0.5
+    provider_retry_max_backoff_seconds: float = 2.0
+
+    rate_limit_window_seconds: int = 60
+    rate_limit_task_create: int = 20
+    rate_limit_planning: int = 10
+    rate_limit_coding: int = 10
+    rate_limit_sandbox: int = 12
+    rate_limit_debug: int = 8
+    rate_limit_publication: int = 5
+    rate_limit_evaluation_launch: int = 2
+
+    evaluation_mode: bool = False
+    evaluation_suite_name: str = "repopilot-eval"
+    evaluation_suite_version: str = "repopilot-eval-v1"
+    evaluation_max_tasks: int = 30
+    evaluation_max_concurrency: int = 1
+    evaluation_task_timeout_seconds: int = 1800
+    evaluation_workspaces_root: Path = Path(
+        "/tmp/repopilot-evaluation-workspaces"
+    )
+    evaluation_success_rate_gate: float = 0.70
+    evaluation_recall_at_5_gate: float = 0.85
+    evaluation_success_drop_fail_pp: float = 5.0
+    evaluation_recall_drop_fail_pp: float = 5.0
+    evaluation_token_increase_warn_ratio: float = 0.25
+    evaluation_p95_latency_increase_warn_ratio: float = 0.30
+
+    enable_sensitive_agent_tracing: bool = False
+    readiness_check_timeout_seconds: float = 2.0
 
     @field_validator("embedding_dimensions")
     @classmethod
@@ -72,6 +128,132 @@ class Settings(BaseSettings):
             )
 
         return value
+
+    @model_validator(mode="after")
+    def validate_settings(
+        self,
+    ) -> "Settings":
+        positive_int_fields = (
+            "database_pool_size",
+            "database_max_overflow",
+            "database_pool_timeout_seconds",
+            "database_pool_recycle_seconds",
+            "embedding_batch_size",
+            "planner_max_turns",
+            "coder_max_turns",
+            "max_changed_files",
+            "max_total_lines_changed",
+            "max_editable_file_size",
+            "debugger_max_turns",
+            "debugger_max_attempts",
+            "debugger_failure_log_max_chars",
+            "sandbox_pids_limit",
+            "sandbox_command_timeout_seconds",
+            "sandbox_overall_timeout_seconds",
+            "sandbox_stdout_max_bytes",
+            "sandbox_stderr_max_bytes",
+            "max_chunk_tokens",
+            "max_context_tokens",
+            "retrieval_top_k_default",
+            "retrieval_top_k_max",
+            "retrieval_query_max_chars",
+            "max_issue_title_chars",
+            "max_issue_body_chars",
+            "max_repository_files",
+            "max_repository_bytes",
+            "max_indexed_files",
+            "max_code_chunks",
+            "max_repository_file_size",
+            "max_symbol_count",
+            "max_task_event_metadata_bytes",
+            "http_max_connections",
+            "http_max_keepalive_connections",
+            "provider_max_retries",
+            "rate_limit_window_seconds",
+            "rate_limit_task_create",
+            "rate_limit_planning",
+            "rate_limit_coding",
+            "rate_limit_sandbox",
+            "rate_limit_debug",
+            "rate_limit_publication",
+            "rate_limit_evaluation_launch",
+            "evaluation_max_tasks",
+            "evaluation_max_concurrency",
+            "evaluation_task_timeout_seconds",
+        )
+
+        for field_name in positive_int_fields:
+            if int(getattr(self, field_name)) <= 0:
+                raise ValueError(
+                    f"{field_name} must be greater than zero"
+                )
+
+        positive_float_fields = (
+            "openai_timeout_seconds",
+            "github_timeout_seconds",
+            "github_connect_timeout_seconds",
+            "provider_retry_initial_backoff_seconds",
+            "provider_retry_max_backoff_seconds",
+            "readiness_check_timeout_seconds",
+        )
+
+        for field_name in positive_float_fields:
+            if float(getattr(self, field_name)) <= 0:
+                raise ValueError(
+                    f"{field_name} must be greater than zero"
+                )
+
+        if self.retrieval_top_k_default > self.retrieval_top_k_max:
+            raise ValueError(
+                "retrieval_top_k_default cannot exceed retrieval_top_k_max"
+            )
+
+        if self.chunk_overlap_tokens >= self.max_chunk_tokens:
+            raise ValueError(
+                "chunk_overlap_tokens must be smaller than max_chunk_tokens"
+            )
+
+        if self.provider_retry_initial_backoff_seconds > self.provider_retry_max_backoff_seconds:
+            raise ValueError(
+                "provider retry initial backoff cannot exceed max backoff"
+            )
+
+        for field_name in (
+            "evaluation_success_rate_gate",
+            "evaluation_recall_at_5_gate",
+        ):
+            value = float(
+                getattr(self, field_name)
+            )
+            if value < 0 or value > 1:
+                raise ValueError(
+                    f"{field_name} must be between 0 and 1"
+                )
+
+        if self.sandbox_install_network in {
+            "host",
+        } or self.sandbox_install_network.startswith(
+            "container:"
+        ):
+            raise ValueError(
+                "sandbox_install_network cannot use host/container network mode"
+            )
+
+        if self.sandbox_execution_network in {
+            "host",
+        } or self.sandbox_execution_network.startswith(
+            "container:"
+        ):
+            raise ValueError(
+                "sandbox_execution_network cannot use host/container network mode"
+            )
+
+        if self.enable_sensitive_agent_tracing:
+            self.planner_trace_include_sensitive_data = True
+            self.coder_trace_include_sensitive_data = True
+            self.debugger_trace_include_sensitive_data = True
+
+        return self
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

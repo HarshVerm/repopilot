@@ -42,6 +42,18 @@ from app.services.sandbox.results import (
     EXECUTION_PASSED,
     STATUS_SKIPPED,
 )
+from app.services.tasks.failures import (
+    REVIEW_INTEGRITY_ERROR,
+    REVIEW_REJECTED as REVIEW_REJECTED_CATEGORY,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    REVIEW_APPROVED,
+    REVIEW_PENDING,
+    REVIEW_REJECTED,
+)
 
 
 PENDING_REVIEW = "pending_review"
@@ -92,6 +104,7 @@ class ReviewService:
         change_set_id: uuid.UUID,
         repository_path: Path,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
     ) -> FinalReview:
         change_set = await self.load_change_set(
             change_set_id,
@@ -121,6 +134,12 @@ class ReviewService:
             change_set,
             db,
         )
+        task_id = (
+            task_id
+            or change_set.task_id
+            or plan.task_id
+            or execution_run.task_id
+        )
         validate_execution_for_review(
             change_set=change_set,
             execution_run=execution_run,
@@ -146,6 +165,31 @@ class ReviewService:
             PENDING_REVIEW,
             APPROVED,
         }:
+            if (
+                task_id is not None
+                and existing.task_id is None
+            ):
+                existing.task_id = task_id
+                await db.commit()
+                await db.refresh(existing)
+            if task_id is not None:
+                target_status = (
+                    REVIEW_APPROVED
+                    if existing.status == APPROVED
+                    else REVIEW_PENDING
+                )
+                await TaskService().transition_task(
+                    task_id=task_id,
+                    new_status=target_status,
+                    db=db,
+                    event_type="review.found",
+                    active_review_id=existing.id,
+                    metadata={
+                        "review_id": str(
+                            existing.id
+                        )
+                    },
+                )
             return existing
 
         if existing and existing.status == REJECTED:
@@ -176,6 +220,7 @@ class ReviewService:
 
         review = FinalReview(
             workspace_id=change_set.workspace_id,
+            task_id=task_id,
             plan_id=plan.id,
             change_set_id=change_set.id,
             execution_run_id=execution_run.id,
@@ -204,6 +249,18 @@ class ReviewService:
         await db.commit()
         await db.refresh(review)
 
+        if task_id is not None:
+            await TaskService().transition_task(
+                task_id=task_id,
+                new_status=REVIEW_PENDING,
+                db=db,
+                event_type="review.pending",
+                active_review_id=review.id,
+                metadata={
+                    "review_id": str(review.id)
+                },
+            )
+
         return review
 
     async def approve_review(
@@ -223,11 +280,27 @@ class ReviewService:
                 "Only pending reviews can be approved"
             )
 
-        await self.revalidate_review_integrity(
-            review=review,
-            repository_path=repository_path,
-            db=db,
-        )
+        try:
+            await self.revalidate_review_integrity(
+                review=review,
+                repository_path=repository_path,
+                db=db,
+            )
+        except ReviewIntegrityError as exc:
+            if review.task_id is not None:
+                await TaskService().set_failure(
+                    task_id=review.task_id,
+                    db=db,
+                    failure_category=REVIEW_INTEGRITY_ERROR,
+                    error=exc,
+                    event_type="review.integrity_failed",
+                    metadata={
+                        "review_id": str(
+                            review.id
+                        )
+                    },
+                )
+            raise
 
         review.status = APPROVED
         review.decision = APPROVED
@@ -236,6 +309,18 @@ class ReviewService:
         )
         await db.commit()
         await db.refresh(review)
+
+        if review.task_id is not None:
+            await TaskService().transition_task(
+                task_id=review.task_id,
+                new_status=REVIEW_APPROVED,
+                db=db,
+                event_type="review.approved",
+                active_review_id=review.id,
+                metadata={
+                    "review_id": str(review.id)
+                },
+            )
 
         return review
 
@@ -266,6 +351,20 @@ class ReviewService:
         )
         await db.commit()
         await db.refresh(review)
+
+        if review.task_id is not None:
+            await TaskService().transition_task(
+                task_id=review.task_id,
+                new_status=REVIEW_REJECTED,
+                db=db,
+                event_type="review.rejected",
+                failure_category=REVIEW_REJECTED_CATEGORY,
+                active_review_id=review.id,
+                metadata={
+                    "review_id": str(review.id),
+                    "reason": rejection_reason,
+                },
+            )
 
         return review
 

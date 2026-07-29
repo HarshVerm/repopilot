@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models.code_index import (
     CodeSymbol,
     RepositoryFile,
@@ -14,6 +15,7 @@ from app.services.indexing.parser import (
 from app.services.indexing.scanner import (
     calculate_sha256,
     scan_repository,
+    RepositoryLimitError,
 )
 from app.services.indexing.symbols import (
     extract_symbols,
@@ -39,6 +41,11 @@ async def index_repository(
     source_files = scan_repository(
         repository_path
     )
+
+    if len(source_files) > settings.max_indexed_files:
+        raise RepositoryLimitError(
+            "indexed source file count exceeds configured limit"
+        )
 
     # MVP: replace previous index
     await db.execute(
@@ -93,6 +100,11 @@ async def index_repository(
                 )
             )
             continue
+
+        if symbols_indexed + len(symbols) > settings.max_symbol_count:
+            raise RepositoryLimitError(
+                "repository symbol count exceeds configured limit"
+            )
 
         file_record = RepositoryFile(
             workspace_id=workspace_id,

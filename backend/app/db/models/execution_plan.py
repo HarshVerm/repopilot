@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -40,6 +41,15 @@ class ExecutionPlan(Base):
 
     workspace_id: Mapped[str] = mapped_column(
         String(36),
+        index=True,
+    )
+
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "repo_pilot_tasks.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
         index=True,
     )
 

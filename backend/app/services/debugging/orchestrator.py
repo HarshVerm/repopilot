@@ -73,6 +73,21 @@ from app.services.sandbox.manager import (
 from app.services.sandbox.results import (
     EXECUTION_PASSED,
 )
+from app.services.tasks.failures import (
+    DEBUG_ATTEMPTS_EXHAUSTED,
+    DEBUG_NO_PROGRESS,
+    DEBUGGER_ERROR,
+    PLAN_REVISION_REQUIRED,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    DEBUGGING,
+    FAILED,
+    TaskTransitionError,
+    VERIFICATION_PASSED,
+)
 
 
 TERMINAL_NON_DEBUGGABLE_STATUSES = {
@@ -124,6 +139,7 @@ class DebugOrchestrator:
         execution_run_id: uuid.UUID,
         repository_path: Path,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
     ) -> DebugWorkflowResult:
         current_run = await self.load_execution_run(
             execution_run_id,
@@ -134,6 +150,36 @@ class DebugOrchestrator:
             raise DebugNotEligibleError(
                 "ExecutionRun is not eligible for debugging"
             )
+
+        task_id = task_id or current_run.task_id
+        task_service = TaskService()
+
+        if task_id is not None:
+            try:
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=DEBUGGING,
+                    db=db,
+                    event_type="debugger.started",
+                    active_execution_run_id=current_run.id,
+                    metadata={
+                        "execution_run_id": str(
+                            current_run.id
+                        )
+                    },
+                )
+            except TaskTransitionError:
+                await task_service.record_event(
+                    task_id=task_id,
+                    event_type="debugger.start_skipped",
+                    db=db,
+                    metadata={
+                        "execution_run_id": str(
+                            current_run.id
+                        )
+                    },
+                    commit=True,
+                )
 
         attempts: list[DebugAttempt] = []
         seen_pairs: set[tuple[str, str]] = set()
@@ -153,12 +199,16 @@ class DebugOrchestrator:
         )
 
         if not initial_classification.eligible:
-            return DebugWorkflowResult(
-                status="stopped",
-                reason=initial_classification.category,
-                attempts=[],
-                final_change_set_id=final_change_set_id,
-                final_execution_run_id=final_execution_run_id,
+            return await self.finalize_task_debug_result(
+                task_id=task_id,
+                result=DebugWorkflowResult(
+                    status="stopped",
+                    reason=initial_classification.category,
+                    attempts=[],
+                    final_change_set_id=final_change_set_id,
+                    final_execution_run_id=final_execution_run_id,
+                ),
+                db=db,
             )
 
         seen_pairs.add(
@@ -182,12 +232,16 @@ class DebugOrchestrator:
             )
 
             if not classification.eligible:
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason=classification.category,
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason=classification.category,
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
 
             parent_change_set = await self.load_change_set(
@@ -225,12 +279,16 @@ class DebugOrchestrator:
                     "no_progress",
                     db,
                 )
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason="no_progress",
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason="no_progress",
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
             except PlanRevisionRequiredError as exc:
                 await self.stop_attempt(
@@ -239,12 +297,16 @@ class DebugOrchestrator:
                     db,
                     diagnosis=str(exc),
                 )
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason="plan_revision_required",
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason="plan_revision_required",
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
             except (
                 PatchSecurityError,
@@ -258,12 +320,16 @@ class DebugOrchestrator:
                     db,
                     diagnosis=exc.__class__.__name__,
                 )
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason="patch_validation_failed",
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason="patch_validation_failed",
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
             except DebuggerExecutionError as exc:
                 await self.stop_attempt(
@@ -272,12 +338,16 @@ class DebugOrchestrator:
                     db,
                     diagnosis=str(exc),
                 )
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason="debugger_execution_failed",
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason="debugger_execution_failed",
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
 
             current_run = attempt_result.retry_execution_run
@@ -294,12 +364,16 @@ class DebugOrchestrator:
                 await db.commit()
                 await db.refresh(attempt)
 
-                return DebugWorkflowResult(
-                    status="passed",
-                    reason=None,
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="passed",
+                        reason=None,
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
 
             retry_classification = classify_execution_run(
@@ -317,12 +391,16 @@ class DebugOrchestrator:
                 await db.commit()
                 await db.refresh(attempt)
 
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason=retry_classification.category,
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason=retry_classification.category,
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
 
             pair = (
@@ -342,12 +420,16 @@ class DebugOrchestrator:
                 await db.commit()
                 await db.refresh(attempt)
 
-                return DebugWorkflowResult(
-                    status="stopped",
-                    reason="no_progress",
-                    attempts=attempts,
-                    final_change_set_id=final_change_set_id,
-                    final_execution_run_id=final_execution_run_id,
+                return await self.finalize_task_debug_result(
+                    task_id=task_id,
+                    result=DebugWorkflowResult(
+                        status="stopped",
+                        reason="no_progress",
+                        attempts=attempts,
+                        final_change_set_id=final_change_set_id,
+                        final_execution_run_id=final_execution_run_id,
+                    ),
+                    db=db,
                 )
 
             seen_pairs.add(pair)
@@ -358,13 +440,91 @@ class DebugOrchestrator:
             await db.commit()
             await db.refresh(attempt)
 
-        return DebugWorkflowResult(
-            status="stopped",
-            reason="max_debug_attempts_exceeded",
-            attempts=attempts,
-            final_change_set_id=final_change_set_id,
-            final_execution_run_id=final_execution_run_id,
+        return await self.finalize_task_debug_result(
+            task_id=task_id,
+            result=DebugWorkflowResult(
+                status="stopped",
+                reason="max_debug_attempts_exceeded",
+                attempts=attempts,
+                final_change_set_id=final_change_set_id,
+                final_execution_run_id=final_execution_run_id,
+            ),
+            db=db,
         )
+
+    async def finalize_task_debug_result(
+        self,
+        *,
+        task_id: uuid.UUID | None,
+        result: DebugWorkflowResult,
+        db: AsyncSession,
+    ) -> DebugWorkflowResult:
+        if task_id is None:
+            return result
+
+        task_service = TaskService()
+        metadata = {
+            "debug_status": result.status,
+            "reason": result.reason,
+            "attempts": len(result.attempts),
+            "final_change_set_id": (
+                str(result.final_change_set_id)
+                if result.final_change_set_id
+                else None
+            ),
+            "final_execution_run_id": (
+                str(result.final_execution_run_id)
+                if result.final_execution_run_id
+                else None
+            ),
+        }
+
+        try:
+            if result.status == "passed":
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=VERIFICATION_PASSED,
+                    db=db,
+                    event_type="debugger.passed",
+                    active_change_set_id=(
+                        result.final_change_set_id
+                    ),
+                    active_execution_run_id=(
+                        result.final_execution_run_id
+                    ),
+                    metadata=metadata,
+                )
+            else:
+                category = debug_failure_category(
+                    result.reason
+                )
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=FAILED,
+                    db=db,
+                    event_type="debugger.stopped",
+                    failure_category=category,
+                    last_error=(
+                        result.reason or category
+                    ),
+                    active_change_set_id=(
+                        result.final_change_set_id
+                    ),
+                    active_execution_run_id=(
+                        result.final_execution_run_id
+                    ),
+                    metadata=metadata,
+                )
+        except TaskTransitionError:
+            await task_service.record_event(
+                task_id=task_id,
+                event_type="debugger.finalize_skipped",
+                db=db,
+                metadata=metadata,
+                commit=True,
+            )
+
+        return result
 
     async def run_attempt(
         self,
@@ -402,6 +562,24 @@ class DebugOrchestrator:
             editor=editor,
             attempt_number=attempt_number,
         )
+        agent_run_id: uuid.UUID | None = None
+        task_service = TaskService()
+
+        if attempt.task_id is not None:
+            agent_run = await task_service.start_agent_run(
+                task_id=attempt.task_id,
+                agent_type="debugger",
+                model=self.debugger_runner.model,
+                db=db,
+                debug_attempt_id=attempt.id,
+                metadata={
+                    "debug_attempt_id": str(
+                        attempt.id
+                    ),
+                    "attempt_number": attempt_number,
+                },
+            )
+            agent_run_id = agent_run.id
 
         try:
             run_result = await self.debugger_runner.run(
@@ -429,6 +607,18 @@ class DebugOrchestrator:
                 repository_path=repository_path,
                 snapshot=snapshot,
             )
+            if (
+                attempt.task_id is not None
+                and agent_run_id is not None
+            ):
+                await task_service.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    db=db,
+                    status="failed",
+                    error_type=exc.__class__.__name__,
+                    error_message=str(exc),
+                    debug_attempt_id=attempt.id,
+                )
             raise DebuggerExecutionError(
                 exc.__class__.__name__
             ) from exc
@@ -442,6 +632,18 @@ class DebugOrchestrator:
                 repository_path=repository_path,
                 snapshot=snapshot,
             )
+            if (
+                attempt.task_id is not None
+                and agent_run_id is not None
+            ):
+                await task_service.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    db=db,
+                    status="failed",
+                    error_type=exc.__class__.__name__,
+                    error_message=str(exc),
+                    debug_attempt_id=attempt.id,
+                )
             raise DebuggerExecutionError(
                 "Debugger did not return valid structured output"
             ) from exc
@@ -451,6 +653,24 @@ class DebugOrchestrator:
             run_result,
             output,
         )
+
+        if (
+            attempt.task_id is not None
+            and agent_run_id is not None
+        ):
+            await task_service.complete_agent_run(
+                agent_run_id=agent_run_id,
+                db=db,
+                status="completed",
+                latency_ms=run_result.latency_ms,
+                input_tokens=run_result.input_tokens,
+                output_tokens=run_result.output_tokens,
+                total_tokens=run_result.total_tokens,
+                tool_calls_count=(
+                    run_result.patch_operations_requested
+                ),
+                debug_attempt_id=attempt.id,
+            )
 
         if output.needs_plan_revision:
             restore_patch_snapshot(
@@ -561,11 +781,27 @@ class DebugOrchestrator:
         await db.commit()
         await db.refresh(attempt)
 
-        retry_execution_run = await self.execution_service.execute_change_set(
-            change_set_id=child_change_set.id,
-            repository_path=repository_path,
-            db=db,
-        )
+        try:
+            retry_execution_run = await self.execution_service.execute_change_set(
+                change_set_id=child_change_set.id,
+                repository_path=repository_path,
+                db=db,
+                task_id=attempt.task_id,
+                acquire_lock=False,
+            )
+        except TypeError as exc:
+            message = str(exc)
+            if (
+                "acquire_lock" not in message
+                and "task_id" not in message
+            ):
+                raise
+
+            retry_execution_run = await self.execution_service.execute_change_set(
+                change_set_id=child_change_set.id,
+                repository_path=repository_path,
+                db=db,
+            )
         attempt.retry_execution_run_id = (
             retry_execution_run.id
         )
@@ -587,6 +823,7 @@ class DebugOrchestrator:
     ) -> ChangeSet:
         child = ChangeSet(
             workspace_id=parent_change_set.workspace_id,
+            task_id=parent_change_set.task_id,
             plan_id=parent_change_set.plan_id,
             parent_change_set_id=(
                 parent_change_set.id
@@ -666,6 +903,10 @@ class DebugOrchestrator:
         attempt = DebugAttempt(
             workspace_id=(
                 parent_change_set.workspace_id
+            ),
+            task_id=(
+                parent_change_set.task_id
+                or failure_run.task_id
             ),
             plan_id=parent_change_set.plan_id,
             parent_change_set_id=(
@@ -808,6 +1049,21 @@ def has_untracked_files(
             repository_path
         ).splitlines()
     )
+
+
+def debug_failure_category(
+    reason: str | None,
+) -> str:
+    if reason == "no_progress":
+        return DEBUG_NO_PROGRESS
+    if reason == "max_debug_attempts_exceeded":
+        return DEBUG_ATTEMPTS_EXHAUSTED
+    if reason == "plan_revision_required":
+        return PLAN_REVISION_REQUIRED
+    if reason == "debugger_execution_failed":
+        return DEBUGGER_ERROR
+
+    return DEBUGGER_ERROR
 
 
 def serialize_debug_attempt(

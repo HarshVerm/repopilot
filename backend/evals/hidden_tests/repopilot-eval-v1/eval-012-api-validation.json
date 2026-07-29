@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "backend/tests/test_hidden_eval.py",
+      "content": "from backend.app.api import create_task\n\n\ndef test_create_task_rejects_blank_title():\n    try:\n        create_task({'title': '   '})\n    except ValueError:\n        return\n    raise AssertionError('blank title was accepted')\n\n\ntest_create_task_rejects_blank_title()\n"
+    }
+  ],
+  "commands": [
+    {
+      "name": "hidden:api-validation",
+      "command_type": "test",
+      "executable": "python",
+      "args": ["backend/tests/test_hidden_eval.py"],
+      "timeout_seconds": 120,
+      "network_enabled": false,
+      "runtime": "python"
+    }
+  ]
+}

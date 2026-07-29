@@ -15,6 +15,9 @@ from app.schemas.publishing import (
 from app.services.changes.git import (
     GitCommandError,
 )
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
+)
 from app.services.publishing.git import (
     GitPushError,
 )
@@ -53,6 +56,13 @@ def get_publication_service() -> PublicationService:
 @router.post(
     "/reviews/{review_id}/publish",
     response_model=PublicationResponse,
+    dependencies=[
+        Depends(
+            enforce_rate_limit(
+                "publication"
+            )
+        )
+    ],
 )
 async def publish_review(
     review_id: UUID,

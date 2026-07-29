@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "backend/tests/test_hidden_eval.py",
+      "content": "from pathlib import Path\n\n\ndef test_task_model_declares_due_date():\n    source = Path('backend/app/models.py').read_text()\n    assert 'due_date' in source\n    assert 'date | None' in source or 'Optional[date]' in source\n"
+    }
+  ],
+  "commands": [
+    {
+      "name": "hidden:task-due-date",
+      "command_type": "test",
+      "executable": "python",
+      "args": ["backend/tests/test_hidden_eval.py"],
+      "timeout_seconds": 120,
+      "network_enabled": false,
+      "runtime": "python"
+    }
+  ]
+}

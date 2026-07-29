@@ -68,6 +68,21 @@ from app.services.publishing.naming import (
 from app.services.reviews.service import (
     ReviewService,
 )
+from app.services.tasks.failures import (
+    GITHUB_PUBLISH_ERROR,
+    GIT_ERROR,
+)
+from app.services.tasks.locking import (
+    TaskOperationLockService,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    COMPLETED,
+    PUBLISHING as TASK_PUBLISHING,
+    TaskTransitionError,
+)
 
 
 PENDING = "pending"
@@ -115,6 +130,7 @@ class PublicationService:
         review_id: uuid.UUID,
         repository_path: Path,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
     ) -> Publication:
         records = await self.load_review_records(
             review_id=review_id,
@@ -123,6 +139,16 @@ class PublicationService:
         review, plan, change_set, execution_run = (
             records
         )
+        task_id = (
+            task_id
+            or review.task_id
+            or plan.task_id
+            or change_set.task_id
+            or execution_run.task_id
+        )
+        task_service = TaskService()
+        lock_service = TaskOperationLockService()
+        lock_acquired = False
         validate_publishable_review(
             review=review,
             plan=plan,
@@ -176,6 +202,47 @@ class PublicationService:
                 validate_published_publication(
                     publication
                 )
+                if task_id is not None:
+                    try:
+                        await task_service.transition_task(
+                            task_id=task_id,
+                            new_status=TASK_PUBLISHING,
+                            db=db,
+                            event_type="publication.found",
+                            publication_id=publication.id,
+                            metadata={
+                                "publication_id": str(
+                                    publication.id
+                                )
+                            },
+                        )
+                        await task_service.transition_task(
+                            task_id=task_id,
+                            new_status=COMPLETED,
+                            db=db,
+                            event_type="publication.completed",
+                            publication_id=publication.id,
+                            metadata={
+                                "publication_id": str(
+                                    publication.id
+                                ),
+                                "pull_request_url": (
+                                    publication.pull_request_url
+                                ),
+                            },
+                        )
+                    except TaskTransitionError:
+                        await task_service.record_event(
+                            task_id=task_id,
+                            event_type="publication.already_completed",
+                            db=db,
+                            metadata={
+                                "publication_id": str(
+                                    publication.id
+                                )
+                            },
+                            commit=True,
+                        )
                 return publication
 
             publication.retry_count += 1
@@ -190,7 +257,29 @@ class PublicationService:
             )
 
         try:
-            return await self.continue_publication(
+            if task_id is not None:
+                await lock_service.acquire(
+                    task_id=task_id,
+                    operation="publishing",
+                    db=db,
+                )
+                lock_acquired = True
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=TASK_PUBLISHING,
+                    db=db,
+                    event_type="publication.started",
+                    active_review_id=review.id,
+                    publication_id=publication.id,
+                    metadata={
+                        "review_id": str(review.id),
+                        "publication_id": str(
+                            publication.id
+                        ),
+                    },
+                )
+
+            publication = await self.continue_publication(
                 publication=publication,
                 review=review,
                 plan=plan,
@@ -201,6 +290,26 @@ class PublicationService:
                 git=git,
                 db=db,
             )
+            if task_id is not None:
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=COMPLETED,
+                    db=db,
+                    event_type="publication.completed",
+                    publication_id=publication.id,
+                    metadata={
+                        "publication_id": str(
+                            publication.id
+                        ),
+                        "commit_sha": (
+                            publication.commit_sha
+                        ),
+                        "pull_request_url": (
+                            publication.pull_request_url
+                        ),
+                    },
+                )
+            return publication
         except (
             GitHubPublisherError,
             PullRequestCreationError,
@@ -214,6 +323,22 @@ class PublicationService:
                 publication,
                 db,
             )
+            if task_id is not None:
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=TASK_PUBLISHING,
+                    db=db,
+                    event_type="publication.partially_published",
+                    failure_category=GITHUB_PUBLISH_ERROR,
+                    last_error=str(exc),
+                    publication_id=publication.id,
+                    metadata={
+                        "publication_id": str(
+                            publication.id
+                        ),
+                        "status": publication.status,
+                    },
+                )
             return publication
         except GitPushError as exc:
             publication.status = FAILED
@@ -225,6 +350,19 @@ class PublicationService:
                 publication,
                 db,
             )
+            if task_id is not None:
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=GIT_ERROR,
+                    error=exc,
+                    event_type="publication.failed",
+                    metadata={
+                        "publication_id": str(
+                            publication.id
+                        )
+                    },
+                )
             return publication
         except (
             BranchNameError,
@@ -240,7 +378,27 @@ class PublicationService:
                 publication,
                 db,
             )
+            if task_id is not None:
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=GITHUB_PUBLISH_ERROR,
+                    error=exc,
+                    event_type="publication.failed",
+                    metadata={
+                        "publication_id": str(
+                            publication.id
+                        )
+                    },
+                )
             raise
+        finally:
+            if lock_acquired and task_id is not None:
+                await lock_service.release(
+                    task_id=task_id,
+                    operation="publishing",
+                    db=db,
+                )
 
     async def continue_publication(
         self,
@@ -714,6 +872,11 @@ class PublicationService:
     ) -> Publication:
         publication = Publication(
             workspace_id=review.workspace_id,
+            task_id=(
+                review.task_id
+                or plan.task_id
+                or change_set.task_id
+            ),
             review_id=review.id,
             plan_id=plan.id,
             change_set_id=change_set.id,

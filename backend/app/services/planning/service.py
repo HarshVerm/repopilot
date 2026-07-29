@@ -21,6 +21,19 @@ from app.services.planning.validation import (
     PlanValidationError,
     validate_planner_output,
 )
+from app.services.tasks.failures import (
+    PLANNER_ERROR,
+    PLANNER_VALIDATION_ERROR,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    PLAN_APPROVED,
+    PLAN_PENDING_APPROVAL,
+    PLAN_REJECTED,
+    PLANNING,
+)
 
 
 class PlanningError(RuntimeError):
@@ -86,7 +99,35 @@ class PlannerService:
         issue: dict,
         context_pack: dict,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
     ) -> ExecutionPlan:
+        task_service = TaskService()
+        agent_run = None
+
+        if task_id is not None:
+            await task_service.transition_task(
+                task_id=task_id,
+                new_status=PLANNING,
+                db=db,
+                event_type="planning.started",
+                metadata={
+                    "workspace_id": workspace_id,
+                    "repository": f"{owner}/{repo}",
+                    "issue_number": issue.get(
+                        "number"
+                    ),
+                },
+            )
+            agent_run = await task_service.start_agent_run(
+                task_id=task_id,
+                agent_type="planner",
+                model=self.planner_runner.model,
+                db=db,
+                metadata={
+                    "workspace_id": workspace_id
+                },
+            )
+
         try:
             planner_input = build_planner_input(
                 owner=owner,
@@ -95,6 +136,22 @@ class PlannerService:
                 context_pack=context_pack,
             )
         except PlannerInputError as exc:
+            if task_id is not None:
+                if agent_run is not None:
+                    await task_service.complete_agent_run(
+                        agent_run_id=agent_run.id,
+                        db=db,
+                        status="failed",
+                        error_type=exc.__class__.__name__,
+                        error_message=str(exc),
+                    )
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=PLANNER_ERROR,
+                    error=exc,
+                    event_type="planner.failed",
+                )
             raise PlanningError(
                 "Planner input could not be built"
             ) from exc
@@ -116,19 +173,61 @@ class PlannerService:
                 run_result.output
             )
         except (RuntimeError, ValidationError) as exc:
+            if task_id is not None:
+                if agent_run is not None:
+                    await task_service.complete_agent_run(
+                        agent_run_id=agent_run.id,
+                        db=db,
+                        status="failed",
+                        error_type=exc.__class__.__name__,
+                        error_message=str(exc),
+                    )
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=PLANNER_ERROR,
+                    error=exc,
+                    event_type="planner.failed",
+                )
             raise PlanningError(
                 "Planner did not return valid structured output"
             ) from exc
 
-        await validate_planner_output(
-            output=output,
-            workspace_id=workspace_id,
-            repository_path=repository_path,
-            db=db,
-        )
+        try:
+            await validate_planner_output(
+                output=output,
+                workspace_id=workspace_id,
+                repository_path=repository_path,
+                db=db,
+            )
+        except PlanValidationError as exc:
+            if task_id is not None:
+                if agent_run is not None:
+                    await task_service.complete_agent_run(
+                        agent_run_id=agent_run.id,
+                        db=db,
+                        status="failed",
+                        latency_ms=run_result.latency_ms,
+                        input_tokens=run_result.input_tokens,
+                        output_tokens=(
+                            run_result.output_tokens
+                        ),
+                        total_tokens=run_result.total_tokens,
+                        error_type=exc.__class__.__name__,
+                        error_message=str(exc),
+                    )
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=PLANNER_VALIDATION_ERROR,
+                    error=exc,
+                    event_type="planner.validation_failed",
+                )
+            raise
 
         plan = ExecutionPlan(
             workspace_id=workspace_id,
+            task_id=task_id,
             repository_owner=owner,
             repository_name=repo,
             issue_number=int(
@@ -159,6 +258,30 @@ class PlannerService:
         db.add(plan)
         await db.commit()
         await db.refresh(plan)
+
+        if task_id is not None and agent_run is not None:
+            await task_service.complete_agent_run(
+                agent_run_id=agent_run.id,
+                db=db,
+                status="completed",
+                latency_ms=run_result.latency_ms,
+                input_tokens=run_result.input_tokens,
+                output_tokens=(
+                    run_result.output_tokens
+                ),
+                total_tokens=run_result.total_tokens,
+                plan_id=plan.id,
+            )
+            await task_service.transition_task(
+                task_id=task_id,
+                new_status=PLAN_PENDING_APPROVAL,
+                db=db,
+                event_type="plan.pending_approval",
+                active_plan_id=plan.id,
+                metadata={
+                    "plan_id": str(plan.id)
+                },
+            )
 
         return plan
 
@@ -198,6 +321,18 @@ class PlannerService:
         await db.commit()
         await db.refresh(plan)
 
+        if plan.task_id is not None:
+            await TaskService().transition_task(
+                task_id=plan.task_id,
+                new_status=PLAN_APPROVED,
+                db=db,
+                event_type="plan.approved",
+                active_plan_id=plan.id,
+                metadata={
+                    "plan_id": str(plan.id)
+                },
+            )
+
         return plan
 
     async def reject_plan(
@@ -226,5 +361,18 @@ class PlannerService:
         plan.rejection_reason = reason
         await db.commit()
         await db.refresh(plan)
+
+        if plan.task_id is not None:
+            await TaskService().transition_task(
+                task_id=plan.task_id,
+                new_status=PLAN_REJECTED,
+                db=db,
+                event_type="plan.rejected",
+                active_plan_id=plan.id,
+                metadata={
+                    "plan_id": str(plan.id),
+                    "reason": reason,
+                },
+            )
 
         return plan

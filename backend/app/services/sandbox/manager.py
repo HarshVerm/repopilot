@@ -35,6 +35,8 @@ from app.services.sandbox.policy import (
 from app.services.sandbox.results import (
     DEPENDENCY_INSTALL,
     EXECUTION_ERROR,
+    EXECUTION_FAILED,
+    EXECUTION_PASSED,
     EXECUTION_RUNNING,
     STATUS_ERROR,
     STATUS_FAIL,
@@ -47,6 +49,21 @@ from app.services.sandbox.results import (
     overall_status,
     skipped_result,
     timeout_result,
+)
+from app.services.tasks.failures import (
+    classify_execution_failure,
+)
+from app.services.tasks.locking import (
+    TaskOperationLockService,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    FAILED,
+    TEST_FAILED,
+    TESTING,
+    VERIFICATION_PASSED,
 )
 
 
@@ -101,6 +118,8 @@ class ExecutionService:
         change_set_id: uuid.UUID,
         repository_path: Path,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
+        acquire_lock: bool = True,
     ) -> ExecutionRun:
         change_set = await db.get(
             ChangeSet,
@@ -124,9 +143,15 @@ class ExecutionService:
             repository_path=repository_path,
         )
 
+        task_id = task_id or change_set.task_id
+        task_service = TaskService()
+        lock_service = TaskOperationLockService()
+        lock_acquired = False
+
         run = ExecutionRun(
             change_set_id=change_set.id,
             workspace_id=change_set.workspace_id,
+            task_id=task_id,
             status=EXECUTION_RUNNING,
             started_at=datetime.now(UTC),
             commands_json=[],
@@ -145,97 +170,139 @@ class ExecutionService:
         await db.commit()
         await db.refresh(run)
 
-        started_at = time.perf_counter()
-        handle: SandboxHandle | None = None
-        cleanup_errors: list[str] = []
-        results: list[CommandResult] = []
-        command_plan: CommandPlan | None = None
-
         try:
-            handle = self.sandbox.prepare(
-                execution_run_id=run.id,
-                source_repository=repository_path,
-            )
-            detection = detect_project(
-                handle.repository_path
-            )
-            command_plan = build_command_plan(
-                detection
-            )
-            run.commands_json = [
-                command.to_json()
-                for command in command_plan.commands
-            ]
-            run.runtime_metadata = {
-                **(run.runtime_metadata or {}),
-                **command_plan.metadata,
-            }
-            results.extend(
-                command_plan.skipped_results
-            )
-
-            results.extend(
-                self.run_commands(
-                    handle=handle,
-                    commands=command_plan.commands,
-                    started_at=started_at,
+            if task_id is not None and acquire_lock:
+                await lock_service.acquire(
+                    task_id=task_id,
+                    operation="testing",
+                    db=db,
                 )
-            )
-        except Exception as exc:
-            run.error_message = sanitize_error(
-                exc
-            )
-            run.status = EXECUTION_ERROR
-        finally:
-            cleanup_errors = self.sandbox.cleanup(
-                handle
-            )
+                lock_acquired = True
 
-        run.duration_ms = (
-            time.perf_counter() - started_at
-        ) * 1000
-        run.completed_at = datetime.now(UTC)
+            if task_id is not None:
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=TESTING,
+                    db=db,
+                    event_type="sandbox.started",
+                    active_change_set_id=change_set.id,
+                    active_execution_run_id=run.id,
+                    metadata={
+                        "change_set_id": str(
+                            change_set.id
+                        ),
+                        "execution_run_id": str(
+                            run.id
+                        ),
+                    },
+                )
 
-        if cleanup_errors:
-            run.runtime_metadata = {
-                **(run.runtime_metadata or {}),
-                "cleanup_errors": cleanup_errors,
-            }
+            started_at = time.perf_counter()
+            handle: SandboxHandle | None = None
+            cleanup_errors: list[str] = []
+            results: list[CommandResult] = []
+            command_plan: CommandPlan | None = None
+
+            try:
+                handle = self.sandbox.prepare(
+                    execution_run_id=run.id,
+                    source_repository=repository_path,
+                )
+                detection = detect_project(
+                    handle.repository_path
+                )
+                command_plan = build_command_plan(
+                    detection
+                )
+                run.commands_json = [
+                    command.to_json()
+                    for command in command_plan.commands
+                ]
+                run.runtime_metadata = {
+                    **(run.runtime_metadata or {}),
+                    **command_plan.metadata,
+                }
+                results.extend(
+                    command_plan.skipped_results
+                )
+
+                results.extend(
+                    self.run_commands(
+                        handle=handle,
+                        commands=command_plan.commands,
+                        started_at=started_at,
+                    )
+                )
+            except Exception as exc:
+                run.error_message = sanitize_error(
+                    exc
+                )
+                run.status = EXECUTION_ERROR
+            finally:
+                cleanup_errors = self.sandbox.cleanup(
+                    handle
+                )
+
+            run.duration_ms = (
+                time.perf_counter() - started_at
+            ) * 1000
+            run.completed_at = datetime.now(UTC)
+
+            if cleanup_errors:
+                run.runtime_metadata = {
+                    **(run.runtime_metadata or {}),
+                    "cleanup_errors": cleanup_errors,
+                }
+
+                if run.status == EXECUTION_RUNNING:
+                    run.status = EXECUTION_ERROR
+                    run.error_message = (
+                        "Sandbox cleanup failed"
+                    )
 
             if run.status == EXECUTION_RUNNING:
-                run.status = EXECUTION_ERROR
-                run.error_message = (
-                    "Sandbox cleanup failed"
+                run.status = overall_status(
+                    results
                 )
 
-        if run.status == EXECUTION_RUNNING:
-            run.status = overall_status(
+            run.timed_out = (
+                run.status == "timeout"
+                or any(
+                    result.status == STATUS_TIMEOUT
+                    for result in results
+                )
+            )
+            run.results_json = [
+                result.to_json()
+                for result in results
+            ]
+            checks = check_statuses(
                 results
             )
+            run.tests_status = checks["tests"]
+            run.lint_status = checks["lint"]
+            run.typecheck_status = checks["typecheck"]
+            run.build_status = checks["build"]
 
-        run.timed_out = (
-            run.status == "timeout"
-            or any(
-                result.status == STATUS_TIMEOUT
-                for result in results
-            )
-        )
-        run.results_json = [
-            result.to_json()
-            for result in results
-        ]
-        checks = check_statuses(
-            results
-        )
-        run.tests_status = checks["tests"]
-        run.lint_status = checks["lint"]
-        run.typecheck_status = checks["typecheck"]
-        run.build_status = checks["build"]
+            await db.commit()
+            await db.refresh(run)
 
-        await db.commit()
-        await db.refresh(run)
+            if task_id is not None:
+                await transition_task_for_execution_run(
+                    task_service=task_service,
+                    task_id=task_id,
+                    run=run,
+                    db=db,
+                )
 
-        return run
+            return run
+        finally:
+            if lock_acquired and task_id is not None:
+                await lock_service.release(
+                    task_id=task_id,
+                    operation="testing",
+                    db=db,
+                )
 
     def run_commands(
         self,
@@ -303,6 +370,69 @@ class ExecutionService:
                 break
 
         return results
+
+
+async def transition_task_for_execution_run(
+    *,
+    task_service: TaskService,
+    task_id: uuid.UUID,
+    run: ExecutionRun,
+    db: AsyncSession,
+) -> None:
+    if run.status == EXECUTION_PASSED:
+        await task_service.transition_task(
+            task_id=task_id,
+            new_status=VERIFICATION_PASSED,
+            db=db,
+            event_type="sandbox.passed",
+            active_execution_run_id=run.id,
+            metadata=execution_task_metadata(
+                run
+            )
+        )
+        return
+
+    failure_category = classify_execution_failure(
+        run
+    )
+    target_status = (
+        TEST_FAILED
+        if run.status == EXECUTION_FAILED
+        else FAILED
+    )
+    await task_service.transition_task(
+        task_id=task_id,
+        new_status=target_status,
+        db=db,
+        event_type="sandbox.failed",
+        failure_category=failure_category,
+        last_error=run.error_message
+        or failure_category,
+        active_execution_run_id=run.id,
+        metadata=execution_task_metadata(
+            run
+        ),
+    )
+
+
+def execution_task_metadata(
+    run: ExecutionRun,
+) -> dict:
+    return {
+        "execution_run_id": str(run.id),
+        "change_set_id": str(
+            run.change_set_id
+        ),
+        "status": run.status,
+        "duration_ms": run.duration_ms,
+        "checks": {
+            "tests": run.tests_status,
+            "lint": run.lint_status,
+            "typecheck": run.typecheck_status,
+            "build": run.build_status,
+        },
+        "timed_out": run.timed_out,
+    }
 
 
 def should_stop_after_result(

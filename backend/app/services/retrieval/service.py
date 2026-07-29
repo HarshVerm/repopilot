@@ -17,6 +17,9 @@ from app.services.embeddings.client import (
     OpenAIEmbeddingClient,
     validate_embedding_dimensions,
 )
+from app.services.hardening.validation import (
+    validate_retrieval_request,
+)
 from app.services.retrieval.context import (
     MAX_CHUNKS_PER_FILE,
     apply_file_diversity,
@@ -168,6 +171,11 @@ async def build_retrieval_index(
         files_processed += 1
         drafts.extend(file_chunks)
 
+        if len(drafts) > settings.max_code_chunks:
+            raise RuntimeError(
+                "code chunk count exceeds configured limit"
+            )
+
     (
         embeddings,
         chunks_embedded,
@@ -225,6 +233,10 @@ async def hybrid_search(
 ) -> dict:
     client = embedding_client or OpenAIEmbeddingClient()
     stripped_query = query.strip()
+    validate_retrieval_request(
+        query=stripped_query,
+        top_k=top_k,
+    )
 
     structural = await retrieve_structural(
         db,

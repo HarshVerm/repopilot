@@ -1,0 +1,13 @@
+{
+  "name": "polyglot-productivity-app",
+  "private": true,
+  "scripts": {
+    "test": "node --test src/__tests__/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest"
+  },
+  "devDependencies": {}
+}

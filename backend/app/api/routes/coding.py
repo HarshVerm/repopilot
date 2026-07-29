@@ -1,3 +1,4 @@
+import time
 from uuid import UUID
 
 from fastapi import (
@@ -35,11 +36,20 @@ from app.schemas.changes import (
 from app.services.changes.git import (
     DirtyWorkspaceError,
 )
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
+)
 from app.services.planning.service import (
     issue_query_text,
 )
 from app.services.retrieval.service import (
     hybrid_search,
+)
+from app.services.tasks.locking import (
+    TaskOperationConflict,
+)
+from app.services.tasks.service import (
+    TaskService,
 )
 
 
@@ -55,6 +65,13 @@ def get_coder_runner():
 @router.post(
     "/plans/{plan_id}/implement",
     response_model=ImplementPlanResponse,
+    dependencies=[
+        Depends(
+            enforce_rate_limit(
+                "coding"
+            )
+        )
+    ],
 )
 async def implement_plan(
     plan_id: UUID,
@@ -117,6 +134,7 @@ async def implement_plan(
         ) from exc
 
     issue["number"] = plan.issue_number
+    retrieval_started = time.perf_counter()
     retrieval_result = await hybrid_search(
         workspace_id=plan.workspace_id,
         query=issue_query_text(issue),
@@ -125,6 +143,46 @@ async def implement_plan(
         embedding_client=embedding_client,
         debug=False,
     )
+    if plan.task_id is not None:
+        await TaskService().record_event(
+            task_id=plan.task_id,
+            event_type="retrieval.completed",
+            db=db,
+            metadata={
+                "workspace_id": plan.workspace_id,
+                "phase": "coding",
+                "final_result_count": len(
+                    retrieval_result.get(
+                        "results",
+                        [],
+                    )
+                ),
+                "context_token_count": (
+                    retrieval_result.get(
+                        "context",
+                        {},
+                    ).get(
+                        "estimated_tokens",
+                        0,
+                    )
+                ),
+                "files_included": len(
+                    retrieval_result.get(
+                        "context",
+                        {},
+                    ).get(
+                        "files",
+                        [],
+                    )
+                ),
+                "latency_ms": (
+                    time.perf_counter()
+                    - retrieval_started
+                )
+                * 1000,
+            },
+            commit=True,
+        )
 
     try:
         change_set = await CodingService(
@@ -142,6 +200,11 @@ async def implement_plan(
             detail=str(exc),
         ) from exc
     except DirtyWorkspaceError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+    except TaskOperationConflict as exc:
         raise HTTPException(
             status_code=409,
             detail=str(exc),

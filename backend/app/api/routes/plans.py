@@ -1,3 +1,4 @@
+import time
 from uuid import UUID
 
 from fastapi import (
@@ -22,6 +23,9 @@ from app.schemas.planning import (
 from app.services.github.client import (
     github_client,
 )
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
+)
 from app.services.planning.agent import (
     AgentsPlannerRunner,
 )
@@ -41,6 +45,21 @@ from app.services.planning.workspace import (
 from app.services.retrieval.service import (
     hybrid_search,
 )
+from app.services.tasks.failures import (
+    RETRIEVAL_ERROR,
+)
+from app.services.tasks.service import (
+    TaskService,
+    TaskValidationError,
+)
+from app.services.tasks.state_machine import (
+    CREATED,
+    INDEXED,
+    REPOSITORY_PREPARING,
+    REPOSITORY_READY,
+    RETRIEVING,
+    TaskTransitionError,
+)
 
 
 router = APIRouter(
@@ -56,9 +75,24 @@ def get_planner_runner():
     return AgentsPlannerRunner()
 
 
+PRE_PLAN_TASK_STATES = {
+    CREATED,
+    REPOSITORY_PREPARING,
+    REPOSITORY_READY,
+    INDEXED,
+}
+
+
 @router.post(
     "/workspaces/{workspace_id}/plan",
     response_model=PlanResponse,
+    dependencies=[
+        Depends(
+            enforce_rate_limit(
+                "planning"
+            )
+        )
+    ],
 )
 async def create_workspace_plan(
     workspace_id: UUID,
@@ -117,6 +151,53 @@ async def create_workspace_plan(
         ) from exc
 
     issue["number"] = request.issue_number
+    task_service = TaskService()
+
+    try:
+        task = await task_service.find_active_task(
+            owner=request.owner,
+            repo=request.repo,
+            issue_number=request.issue_number,
+            db=db,
+        )
+
+        if (
+            task is None
+            or task.status
+            not in PRE_PLAN_TASK_STATES
+        ):
+            task = await task_service.create_task(
+                owner=request.owner,
+                repo=request.repo,
+                issue_number=request.issue_number,
+                db=db,
+                reuse_active=False,
+            )
+
+        task = await task_service.attach_workspace(
+            task_id=task.id,
+            workspace_id=str(workspace_id),
+            db=db,
+        )
+        task = await task_service.transition_task(
+            task_id=task.id,
+            new_status=RETRIEVING,
+            db=db,
+            event_type="retrieval.started",
+            metadata={
+                "workspace_id": str(workspace_id)
+            },
+        )
+    except (
+        TaskValidationError,
+        TaskTransitionError,
+    ) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    retrieval_started = time.perf_counter()
 
     try:
         retrieval_result = await hybrid_search(
@@ -126,6 +207,44 @@ async def create_workspace_plan(
             db=db,
             embedding_client=embedding_client,
             debug=False,
+        )
+        await task_service.record_event(
+            task_id=task.id,
+            event_type="retrieval.completed",
+            db=db,
+            metadata={
+                "workspace_id": str(workspace_id),
+                "final_result_count": len(
+                    retrieval_result.get(
+                        "results",
+                        [],
+                    )
+                ),
+                "context_token_count": (
+                    retrieval_result.get(
+                        "context",
+                        {},
+                    ).get(
+                        "estimated_tokens",
+                        0,
+                    )
+                ),
+                "files_included": len(
+                    retrieval_result.get(
+                        "context",
+                        {},
+                    ).get(
+                        "files",
+                        [],
+                    )
+                ),
+                "latency_ms": (
+                    time.perf_counter()
+                    - retrieval_started
+                )
+                * 1000,
+            },
+            commit=True,
         )
         plan = await PlannerService(
             planner_runner=planner_runner
@@ -137,6 +256,7 @@ async def create_workspace_plan(
             issue=issue,
             context_pack=retrieval_result["context"],
             db=db,
+            task_id=task.id,
         )
     except PlanValidationError as exc:
         raise HTTPException(
@@ -148,6 +268,15 @@ async def create_workspace_plan(
             status_code=502,
             detail=str(exc),
         ) from exc
+    except Exception as exc:
+        await task_service.set_failure(
+            task_id=task.id,
+            db=db,
+            failure_category=RETRIEVAL_ERROR,
+            error=exc,
+            event_type="retrieval.failed",
+        )
+        raise
 
     return serialize_plan(plan)
 

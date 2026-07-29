@@ -3,6 +3,10 @@ from typing import Any, Protocol
 from openai import AsyncOpenAI
 
 from app.core.config import settings
+from app.services.hardening.retries import (
+    RetryPolicy,
+    retry_async,
+)
 
 
 class EmbeddingConfigurationError(RuntimeError):
@@ -63,7 +67,9 @@ class OpenAIEmbeddingClient:
             )
 
         self._client = AsyncOpenAI(
-            api_key=self.api_key
+            api_key=self.api_key,
+            timeout=settings.openai_timeout_seconds,
+            max_retries=0,
         )
 
         return self._client
@@ -91,10 +97,15 @@ class OpenAIEmbeddingClient:
             batch = texts[
                 start : start + self.batch_size
             ]
-            response = await client.embeddings.create(
-                model=self.model,
-                input=batch,
-                dimensions=self.dimensions,
+            response = await retry_async(
+                lambda: client.embeddings.create(
+                    model=self.model,
+                    input=batch,
+                    dimensions=self.dimensions,
+                ),
+                policy=RetryPolicy(
+                    max_attempts=settings.provider_max_retries,
+                ),
             )
             response_data = sorted(
                 response.data,

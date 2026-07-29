@@ -40,6 +40,18 @@ from app.api.routes.publishing import (
     router as publishing_router,
 )
 
+from app.api.routes.tasks import (
+    router as tasks_router,
+)
+
+from app.api.routes.readiness import (
+    router as readiness_router,
+)
+
+from app.api.routes.evaluation import (
+    router as evaluation_router,
+)
+
 
 api_router = APIRouter(
     prefix="/api/v1"
@@ -83,4 +95,16 @@ api_router.include_router(
 
 api_router.include_router(
     publishing_router
+)
+
+api_router.include_router(
+    tasks_router
+)
+
+api_router.include_router(
+    readiness_router
+)
+
+api_router.include_router(
+    evaluation_router
 )

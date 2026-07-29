@@ -22,6 +22,9 @@ from app.services.debugging.orchestrator import (
 from app.services.debugging.policy import (
     DebugNotEligibleError,
 )
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
+)
 
 
 router = APIRouter(
@@ -36,6 +39,13 @@ def get_debug_orchestrator() -> DebugOrchestrator:
 @router.post(
     "/execution-runs/{execution_run_id}/debug",
     response_model=DebugRunResponse,
+    dependencies=[
+        Depends(
+            enforce_rate_limit(
+                "debug"
+            )
+        )
+    ],
 )
 async def debug_execution_run(
     execution_run_id: UUID,

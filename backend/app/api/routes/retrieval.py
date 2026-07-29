@@ -17,6 +17,9 @@ from app.schemas.retrieval import (
 from app.services.embeddings.client import (
     OpenAIEmbeddingClient,
 )
+from app.services.hardening.validation import (
+    InputLimitError,
+)
 from app.services.retrieval.service import (
     build_retrieval_index,
     hybrid_search,
@@ -89,11 +92,17 @@ async def search_retrieval(
             detail="Query must not be blank",
         )
 
-    return await hybrid_search(
-        workspace_id=str(workspace_id),
-        query=query,
-        top_k=request.top_k,
-        db=db,
-        embedding_client=embedding_client,
-        debug=request.debug,
-    )
+    try:
+        return await hybrid_search(
+            workspace_id=str(workspace_id),
+            query=query,
+            top_k=request.top_k,
+            db=db,
+            embedding_client=embedding_client,
+            debug=request.debug,
+        )
+    except InputLimitError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc

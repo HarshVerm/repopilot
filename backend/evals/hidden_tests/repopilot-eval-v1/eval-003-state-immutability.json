@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "backend/tests/test_hidden_eval.py",
+      "content": "from pathlib import Path\n\n\ndef test_toggle_todo_does_not_mutate_existing_state():\n    source = Path('src/state/todos.ts').read_text()\n    assert 'found.completed =' not in source\n    assert '.map(' in source\n    assert '...todo' in source\n"
+    }
+  ],
+  "commands": [
+    {
+      "name": "hidden:state-immutability",
+      "command_type": "test",
+      "executable": "python",
+      "args": ["backend/tests/test_hidden_eval.py"],
+      "timeout_seconds": 120,
+      "network_enabled": false,
+      "runtime": "python"
+    }
+  ]
+}

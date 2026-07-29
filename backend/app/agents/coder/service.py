@@ -43,6 +43,22 @@ from app.services.changes.validator import (
     UnauthorizedFileChangeError,
     validate_actual_changes,
 )
+from app.services.tasks.failures import (
+    CODER_ERROR,
+    PATCH_POLICY_ERROR,
+    PLAN_REVISION_REQUIRED,
+)
+from app.services.tasks.locking import (
+    TaskOperationConflict,
+    TaskOperationLockService,
+)
+from app.services.tasks.service import (
+    TaskService,
+)
+from app.services.tasks.state_machine import (
+    CODING,
+    PATCH_GENERATED,
+)
 
 
 class PlanNotApprovedError(ValueError):
@@ -217,11 +233,18 @@ class CodingService:
         issue: dict,
         context_pack: dict,
         db: AsyncSession,
+        task_id: uuid.UUID | None = None,
     ) -> ChangeSet:
         if plan.status != "approved":
             raise PlanNotApprovedError(
                 "Only approved plans can be implemented"
             )
+
+        task_id = task_id or plan.task_id
+        task_service = TaskService()
+        lock_service = TaskOperationLockService()
+        lock_acquired = False
+        agent_run_id: uuid.UUID | None = None
 
         require_clean_workspace(
             repository_path
@@ -243,6 +266,7 @@ class CodingService:
 
         change_set = ChangeSet(
             workspace_id=plan.workspace_id,
+            task_id=task_id,
             plan_id=plan.id,
             plan_version=1,
             approved_plan_json=plan.plan_json,
@@ -264,7 +288,46 @@ class CodingService:
             attribute_names=["files"],
         )
 
+        if task_id is not None:
+            await lock_service.acquire(
+                task_id=task_id,
+                operation="coding",
+                db=db,
+            )
+            lock_acquired = True
+            await task_service.transition_task(
+                task_id=task_id,
+                new_status=CODING,
+                db=db,
+                event_type="coding.started",
+                active_plan_id=plan.id,
+                active_change_set_id=change_set.id,
+                metadata={
+                    "plan_id": str(plan.id),
+                    "change_set_id": str(
+                        change_set.id
+                    ),
+                    "workspace_id": plan.workspace_id,
+                },
+            )
+
         try:
+            if task_id is not None:
+                agent_run = await task_service.start_agent_run(
+                    task_id=task_id,
+                    agent_type="coder",
+                    model=self.coder_runner.model,
+                    db=db,
+                    plan_id=plan.id,
+                    change_set_id=change_set.id,
+                    metadata={
+                        "change_set_id": str(
+                            change_set.id
+                        )
+                    },
+                )
+                agent_run_id = agent_run.id
+
             coder_input = build_coder_input(
                 issue=issue,
                 plan=plan,
@@ -310,6 +373,38 @@ class CodingService:
                     change_set,
                     attribute_names=["files"],
                 )
+                if (
+                    task_id is not None
+                    and agent_run_id is not None
+                ):
+                    await task_service.complete_agent_run(
+                        agent_run_id=agent_run_id,
+                        db=db,
+                        status="completed",
+                        latency_ms=run_result.latency_ms,
+                        input_tokens=run_result.input_tokens,
+                        output_tokens=(
+                            run_result.output_tokens
+                        ),
+                        total_tokens=run_result.total_tokens,
+                        tool_calls_count=(
+                            run_result.patch_operations_requested
+                        ),
+                        change_set_id=change_set.id,
+                    )
+                    await task_service.set_failure(
+                        task_id=task_id,
+                        db=db,
+                        failure_category=PLAN_REVISION_REQUIRED,
+                        error=change_set.revision_reason
+                        or "Plan revision required",
+                        event_type="coder.plan_revision_required",
+                        metadata={
+                            "change_set_id": str(
+                                change_set.id
+                            )
+                        },
+                    )
                 return change_set
 
             status = get_git_status(
@@ -347,6 +442,46 @@ class CodingService:
                 change_set,
                 attribute_names=["files"],
             )
+            if (
+                task_id is not None
+                and agent_run_id is not None
+            ):
+                await task_service.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    db=db,
+                    status="completed",
+                    latency_ms=run_result.latency_ms,
+                    input_tokens=run_result.input_tokens,
+                    output_tokens=(
+                        run_result.output_tokens
+                    ),
+                    total_tokens=run_result.total_tokens,
+                    tool_calls_count=(
+                        run_result.patch_operations_requested
+                    ),
+                    change_set_id=change_set.id,
+                )
+                await task_service.transition_task(
+                    task_id=task_id,
+                    new_status=PATCH_GENERATED,
+                    db=db,
+                    event_type="patch.generated",
+                    active_change_set_id=change_set.id,
+                    metadata={
+                        "change_set_id": str(
+                            change_set.id
+                        ),
+                        "files_changed": (
+                            change_set.files_changed
+                        ),
+                        "lines_added": (
+                            change_set.lines_added
+                        ),
+                        "lines_deleted": (
+                            change_set.lines_deleted
+                        ),
+                    },
+                )
             return change_set
         except (
             PatchSecurityError,
@@ -359,6 +494,30 @@ class CodingService:
                 str(exc),
                 db,
             )
+            if (
+                task_id is not None
+                and agent_run_id is not None
+            ):
+                await task_service.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    db=db,
+                    status="completed",
+                    error_type=exc.__class__.__name__,
+                    error_message=str(exc),
+                    change_set_id=change_set.id,
+                )
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=PATCH_POLICY_ERROR,
+                    error=exc,
+                    event_type="patch.validation_failed",
+                    metadata={
+                        "change_set_id": str(
+                            change_set.id
+                        )
+                    },
+                )
             return change_set
         except Exception as exc:
             rollback_workspace(
@@ -373,7 +532,39 @@ class CodingService:
                 change_set,
                 attribute_names=["files"],
             )
+            if (
+                task_id is not None
+                and agent_run_id is not None
+            ):
+                await task_service.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    db=db,
+                    status="failed",
+                    error_type=exc.__class__.__name__,
+                    error_message=str(exc),
+                    change_set_id=change_set.id,
+                )
+            if task_id is not None:
+                await task_service.set_failure(
+                    task_id=task_id,
+                    db=db,
+                    failure_category=CODER_ERROR,
+                    error=exc,
+                    event_type="coder.failed",
+                    metadata={
+                        "change_set_id": str(
+                            change_set.id
+                        )
+                    },
+                )
             return change_set
+        finally:
+            if lock_acquired and task_id is not None:
+                await lock_service.release(
+                    task_id=task_id,
+                    operation="coding",
+                    db=db,
+                )
 
     def apply_run_metadata(
         self,

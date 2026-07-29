@@ -52,6 +52,15 @@ class ExecutionRun(Base):
         index=True,
     )
 
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "repo_pilot_tasks.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
     status: Mapped[str] = mapped_column(
         String(30),
         default="pending",
