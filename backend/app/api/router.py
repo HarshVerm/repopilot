@@ -16,6 +16,10 @@ from app.api.routes.retrieval import (
     router as retrieval_router,
 )
 
+from app.api.routes.plans import (
+    router as plans_router,
+)
+
 
 api_router = APIRouter(
     prefix="/api/v1"
@@ -35,4 +39,8 @@ api_router.include_router(
 
 api_router.include_router(
     retrieval_router
+)
+
+api_router.include_router(
+    plans_router
 )

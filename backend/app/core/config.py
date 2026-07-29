@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1536
     embedding_batch_size: int = 32
 
+    planner_model: str = "gpt-5-mini"
+    planner_max_turns: int = 4
+    planner_trace_include_sensitive_data: bool = False
+
     max_chunk_tokens: int = 1200
     chunk_overlap_tokens: int = 100
     max_context_tokens: int = 6000
