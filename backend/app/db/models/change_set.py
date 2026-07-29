@@ -53,6 +53,15 @@ class ChangeSet(Base):
         index=True,
     )
 
+    parent_change_set_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "change_sets.id",
+            ondelete="RESTRICT",
+        ),
+        index=True,
+        nullable=True,
+    )
+
     plan_version: Mapped[int] = mapped_column(
         Integer,
         default=1,

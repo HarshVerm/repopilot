@@ -2,12 +2,13 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.db.models.change_set import (
     ChangeSet,
     ChangeSetFile,
 )
+from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
 from app.db.session import AsyncSessionLocal
@@ -220,17 +221,55 @@ async def cleanup_execution_workspace(
 ) -> None:
     async with AsyncSessionLocal() as db:
         await db.execute(
+            delete(DebugAttempt).where(
+                DebugAttempt.workspace_id
+                == workspace_id
+            )
+        )
+        await db.execute(
             delete(ExecutionRun).where(
                 ExecutionRun.workspace_id
                 == workspace_id
             )
         )
-        await db.execute(
-            delete(ChangeSet).where(
+
+        result = await db.execute(
+            select(
+                ChangeSet.id,
+                ChangeSet.parent_change_set_id,
+            ).where(
                 ChangeSet.workspace_id
                 == workspace_id
             )
         )
+        remaining = {
+            row.id: row.parent_change_set_id
+            for row in result
+        }
+
+        while remaining:
+            leaves = [
+                change_set_id
+                for change_set_id in remaining
+                if change_set_id
+                not in set(remaining.values())
+            ]
+
+            if not leaves:
+                leaves = list(remaining)
+
+            for change_set_id in leaves:
+                await db.execute(
+                    delete(ChangeSet).where(
+                        ChangeSet.id
+                        == change_set_id
+                    )
+                )
+                remaining.pop(
+                    change_set_id,
+                    None,
+                )
+
         await db.execute(
             delete(ExecutionPlan).where(
                 ExecutionPlan.workspace_id

@@ -9,12 +9,14 @@ from app.db.models.change_set import (
 )
 from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
+from app.db.models.debug_attempt import DebugAttempt
 
 __all__ = [
     "ChangeSet",
     "ChangeSetFile",
     "CodeChunk",
     "CodeSymbol",
+    "DebugAttempt",
     "ExecutionPlan",
     "ExecutionRun",
     "RepositoryFile",

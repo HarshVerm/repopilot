@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     max_total_lines_changed: int = 1000
     max_editable_file_size: int = 2_000_000
 
+    debugger_model: str = "gpt-5-mini"
+    debugger_max_turns: int = 6
+    debugger_max_attempts: int = 3
+    debugger_trace_include_sensitive_data: bool = False
+    debugger_failure_log_max_chars: int = 12_000
+
     sandbox_root: Path = Path(
         "/tmp/repopilot-sandboxes"
     )

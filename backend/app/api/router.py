@@ -28,6 +28,10 @@ from app.api.routes.execution import (
     router as execution_router,
 )
 
+from app.api.routes.debugging import (
+    router as debugging_router,
+)
+
 
 api_router = APIRouter(
     prefix="/api/v1"
@@ -59,4 +63,8 @@ api_router.include_router(
 
 api_router.include_router(
     execution_router
+)
+
+api_router.include_router(
+    debugging_router
 )
