@@ -1,8 +1,11 @@
-import hashlib
 import re
 
 from app.db.models.execution_run import (
     ExecutionRun,
+)
+from app.services.changes.hashing import (
+    diff_hash,
+    sha256_text,
 )
 from app.services.debugging.failure_classifier import (
     FailureClassification,
@@ -19,29 +22,6 @@ IMPORTANT_MARKERS = (
     "assert",
     "exception",
 )
-
-
-def sha256_text(
-    value: str,
-) -> str:
-    return hashlib.sha256(
-        value.encode("utf-8")
-    ).hexdigest()
-
-
-def diff_hash(
-    diff: str | None,
-) -> str:
-    normalized = (
-        diff or ""
-    ).replace(
-        "\r\n",
-        "\n",
-    )
-
-    return sha256_text(
-        normalized.strip()
-    )
 
 
 def failure_fingerprint(

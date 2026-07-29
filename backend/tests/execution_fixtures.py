@@ -11,12 +11,16 @@ from app.db.models.change_set import (
 from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
+from app.db.models.final_review import FinalReview
 from app.db.session import AsyncSessionLocal
 from app.services.changes.diff import (
     summarize_diff,
 )
 from app.services.changes.git import (
     get_base_commit_sha,
+)
+from app.services.changes.hashing import (
+    diff_hash,
 )
 from app.services.sandbox.docker import (
     SandboxExecutionError,
@@ -182,6 +186,9 @@ async def seed_generated_change_set(
             base_commit_sha=base_commit_sha,
             summary="Generated debounce patch.",
             diff=diff_summary.diff,
+            diff_hash=diff_hash(
+                diff_summary.diff
+            ),
             files_changed=len(
                 diff_summary.files
             ),
@@ -220,19 +227,6 @@ async def cleanup_execution_workspace(
     workspace_id: str,
 ) -> None:
     async with AsyncSessionLocal() as db:
-        await db.execute(
-            delete(DebugAttempt).where(
-                DebugAttempt.workspace_id
-                == workspace_id
-            )
-        )
-        await db.execute(
-            delete(ExecutionRun).where(
-                ExecutionRun.workspace_id
-                == workspace_id
-            )
-        )
-
         result = await db.execute(
             select(
                 ChangeSet.id,
@@ -246,6 +240,40 @@ async def cleanup_execution_workspace(
             row.id: row.parent_change_set_id
             for row in result
         }
+        change_set_ids = set(
+            remaining
+        )
+
+        await db.execute(
+            delete(FinalReview).where(
+                FinalReview.workspace_id
+                == workspace_id
+            )
+        )
+        await db.execute(
+            delete(DebugAttempt).where(
+                DebugAttempt.workspace_id
+                == workspace_id
+            )
+        )
+
+        execution_filter = (
+            ExecutionRun.workspace_id
+            == workspace_id
+        )
+
+        if change_set_ids:
+            execution_filter = execution_filter | (
+                ExecutionRun.change_set_id.in_(
+                    change_set_ids
+                )
+            )
+
+        await db.execute(
+            delete(ExecutionRun).where(
+                execution_filter
+            )
+        )
 
         while remaining:
             leaves = [

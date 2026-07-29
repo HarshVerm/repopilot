@@ -1,5 +1,4 @@
 import uuid
-import hashlib
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +31,9 @@ from app.services.changes.git import (
     get_git_status,
     get_tree_hash,
     require_clean_workspace,
+)
+from app.services.changes.hashing import (
+    diff_hash,
 )
 from app.services.changes.snapshot import (
     rollback_workspace,
@@ -77,14 +79,6 @@ def status_has_untracked_files(
         line.startswith("?? ")
         for line in status_output.splitlines()
     )
-
-
-def sha256_text(
-    text: str,
-) -> str:
-    return hashlib.sha256(
-        text.encode("utf-8")
-    ).hexdigest()
 
 
 def serialize_change_set_file(
@@ -342,7 +336,10 @@ class CodingService:
                 diff_summary,
             )
             change_set.after_tree_hash = (
-                sha256_text(diff_summary.diff)
+                diff_hash(diff_summary.diff)
+            )
+            change_set.diff_hash = diff_hash(
+                diff_summary.diff
             )
             change_set.status = "generated"
             await db.commit()

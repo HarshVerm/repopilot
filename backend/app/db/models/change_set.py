@@ -91,6 +91,11 @@ class ChangeSet(Base):
         nullable=True,
     )
 
+    diff_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
     files_changed: Mapped[int] = mapped_column(
         Integer,
         default=0,

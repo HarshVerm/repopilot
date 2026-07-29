@@ -603,6 +603,9 @@ class DebugOrchestrator:
             ),
             summary=output.diagnosis,
             diff=diff_summary.diff,
+            diff_hash=diff_hash(
+                diff_summary.diff
+            ),
             files_changed=len(
                 diff_summary.files
             ),
