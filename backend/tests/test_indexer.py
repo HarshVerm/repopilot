@@ -206,6 +206,54 @@ def test_index_repository_replaces_existing_index(
     asyncio.run(run_test())
 
 
+def test_index_repository_indexes_plain_text_without_ast_symbols(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    content = b"RepoPilot should use this text as repository context.\n"
+    write_file(
+        repo,
+        "notes.txt",
+        content,
+    )
+    init_git_repo(repo)
+
+    async def run_test():
+        try:
+            async with AsyncSessionLocal() as db:
+                result = await index_repository(
+                    workspace_id,
+                    repo,
+                    db,
+                )
+
+            counts = await workspace_counts(
+                workspace_id
+            )
+            stored_hash = await workspace_file_hash(
+                workspace_id,
+                "notes.txt",
+            )
+
+            assert result["files_discovered"] == 1
+            assert result["files_indexed"] == 1
+            assert result["files_failed"] == 0
+            assert result["symbols_indexed"] == 0
+            assert counts == (1, 0)
+            assert stored_hash == hashlib.sha256(
+                content
+            ).hexdigest()
+        finally:
+            await delete_workspace_index(
+                workspace_id
+            )
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
 def test_index_repository_continues_after_file_parse_failure(
     tmp_path: Path,
     monkeypatch,

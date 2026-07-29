@@ -22,6 +22,9 @@ from app.db.models.final_review import (
 from app.db.models.publication import (
     Publication,
 )
+from app.observability.logging import (
+    log_task_event,
+)
 from app.services.changes.git import (
     GitCommandError,
 )
@@ -32,6 +35,10 @@ from app.services.publishing.authentication import (
     GitHubAuthenticator,
     GitHubCredentials,
     SettingsGitHubAuthenticator,
+)
+from app.services.github.app_client import (
+    GitHubAppClient,
+    github_app_client,
 )
 from app.services.publishing.git import (
     GitPushError,
@@ -66,6 +73,8 @@ from app.services.publishing.naming import (
     validate_branch_name,
 )
 from app.services.reviews.service import (
+    PENDING_REVIEW,
+    ReviewIntegrityError,
     ReviewService,
 )
 from app.services.tasks.failures import (
@@ -80,7 +89,10 @@ from app.services.tasks.service import (
 )
 from app.services.tasks.state_machine import (
     COMPLETED,
+    FAILED as TASK_FAILED,
     PUBLISHING as TASK_PUBLISHING,
+    REVIEW_APPROVED,
+    REVIEW_PENDING,
     TaskTransitionError,
 )
 
@@ -103,6 +115,7 @@ class PublicationService:
         | None = None,
         github_publisher: GitHubPublisher | None = None,
         authenticator: GitHubAuthenticator | None = None,
+        github_app: GitHubAppClient | None = None,
     ) -> None:
         self.review_service = (
             review_service or ReviewService()
@@ -123,6 +136,7 @@ class PublicationService:
             authenticator
             or SettingsGitHubAuthenticator()
         )
+        self.github_app = github_app or github_app_client
 
     async def publish_review(
         self,
@@ -131,6 +145,9 @@ class PublicationService:
         repository_path: Path,
         db: AsyncSession,
         task_id: uuid.UUID | None = None,
+        github_installation_id: int | None = None,
+        installation_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
     ) -> Publication:
         records = await self.load_review_records(
             review_id=review_id,
@@ -165,10 +182,20 @@ class PublicationService:
         git = self.git_factory(
             repository_path
         )
-        credentials = await self.authenticator.get_credentials(
-            owner=plan.repository_owner,
-            repo=plan.repository_name,
-        )
+        if github_installation_id is not None:
+            credentials = GitHubCredentials(
+                username="x-access-token",
+                token=(
+                    await self.github_app.create_installation_token(
+                        github_installation_id
+                    )
+                ),
+            )
+        else:
+            credentials = await self.authenticator.get_credentials(
+                owner=plan.repository_owner,
+                repo=plan.repository_name,
+            )
         repository_metadata = await self.github_publisher.get_repository(
             owner=plan.repository_owner,
             repo=plan.repository_name,
@@ -178,19 +205,38 @@ class PublicationService:
             review_id=review.id,
             db=db,
         )
+        is_retry = (
+            publication is not None
+            and publication.status != PUBLISHED
+        )
+        previous_publication_status = (
+            publication.status
+            if publication is not None
+            else None
+        )
 
         if publication is None:
-            await self.review_service.revalidate_review_integrity(
-                review=review,
-                repository_path=repository_path,
-                db=db,
-            )
+            try:
+                await self.review_service.revalidate_review_integrity(
+                    review=review,
+                    repository_path=repository_path,
+                    db=db,
+                )
+            except ReviewIntegrityError:
+                await self.invalidate_review_approval(
+                    review=review,
+                    task_id=task_id,
+                    db=db,
+                )
+                raise
             publication = await self.create_publication(
                 review=review,
                 plan=plan,
                 change_set=change_set,
                 base_branch=repository_metadata.default_branch,
                 db=db,
+                installation_id=installation_id,
+                repository_id=repository_id,
             )
         else:
             validate_existing_publication(
@@ -246,6 +292,7 @@ class PublicationService:
                 return publication
 
             publication.retry_count += 1
+            publication.publication_attempt_id = uuid.uuid4()
             publication.error_message = None
             if publication.base_branch is None:
                 publication.base_branch = (
@@ -264,6 +311,26 @@ class PublicationService:
                     db=db,
                 )
                 lock_acquired = True
+                task = await task_service.require_task(
+                    task_id=task_id,
+                    db=db,
+                )
+                retrying_failed_task = (
+                    is_retry
+                    and task.status == TASK_FAILED
+                )
+                log_task_event(
+                    "publication.attempt_started",
+                    task_id=str(task_id),
+                    review_id=str(review.id),
+                    publication_id=str(publication.id),
+                    retry=is_retry,
+                    retry_count=publication.retry_count,
+                    previous_publication_status=(
+                        previous_publication_status
+                    ),
+                    previous_task_status=task.status,
+                )
                 await task_service.transition_task(
                     task_id=task_id,
                     new_status=TASK_PUBLISHING,
@@ -277,6 +344,8 @@ class PublicationService:
                             publication.id
                         ),
                     },
+                    allow_reconcile=retrying_failed_task,
+                    clear_failure=retrying_failed_task,
                 )
 
             publication = await self.continue_publication(
@@ -315,6 +384,8 @@ class PublicationService:
             PullRequestCreationError,
         ) as exc:
             publication.status = PARTIALLY_PUBLISHED
+            publication.failure_stage = "pull_request"
+            publication.failure_reason = exc.__class__.__name__
             publication.error_message = safe_public_error(
                 str(exc),
                 credentials,
@@ -342,6 +413,8 @@ class PublicationService:
             return publication
         except GitPushError as exc:
             publication.status = FAILED
+            publication.failure_stage = "push"
+            publication.failure_reason = exc.__class__.__name__
             publication.error_message = safe_public_error(
                 str(exc),
                 credentials,
@@ -370,6 +443,8 @@ class PublicationService:
             PublicationError,
         ) as exc:
             publication.status = FAILED
+            publication.failure_stage = "integrity"
+            publication.failure_reason = exc.__class__.__name__
             publication.error_message = safe_public_error(
                 str(exc),
                 credentials,
@@ -399,6 +474,40 @@ class PublicationService:
                     operation="publishing",
                     db=db,
                 )
+
+    async def invalidate_review_approval(
+        self,
+        *,
+        review: FinalReview,
+        task_id: uuid.UUID | None,
+        db: AsyncSession,
+    ) -> None:
+        review.status = PENDING_REVIEW
+        review.decision = None
+        review.reviewed_at = None
+        review.reviewed_by = None
+        review.reviewed_by_user_id = None
+        await db.commit()
+        await db.refresh(review)
+        if task_id is None:
+            return
+        task_service = TaskService()
+        task = await task_service.get_task(
+            task_id=task_id,
+            db=db,
+        )
+        if task is not None and task.status == REVIEW_APPROVED:
+            await task_service.transition_task(
+                task_id=task_id,
+                new_status=REVIEW_PENDING,
+                db=db,
+                event_type="review.approval_invalidated",
+                active_review_id=review.id,
+                metadata={
+                    "review_id": str(review.id),
+                    "reason": "diff_integrity_changed",
+                },
+            )
 
     async def continue_publication(
         self,
@@ -496,6 +605,22 @@ class PublicationService:
         working_hash = diff_hash(
             git.working_tree_diff()
         )
+        log_task_event(
+            "publication.working_diff_checked",
+            task_id=(
+                str(publication.task_id)
+                if publication.task_id
+                else None
+            ),
+            review_id=str(review.id),
+            publication_id=str(publication.id),
+            actual_diff_hash=working_hash,
+            expected_diff_hash=review.diff_hash,
+            matches=(
+                working_hash
+                == review.diff_hash
+            ),
+        )
         assert_hash_matches(
             actual=working_hash,
             expected=review.diff_hash,
@@ -530,6 +655,22 @@ class PublicationService:
 
         branch_working_hash = diff_hash(
             git.working_tree_diff()
+        )
+        log_task_event(
+            "publication.branch_diff_checked",
+            task_id=(
+                str(publication.task_id)
+                if publication.task_id
+                else None
+            ),
+            review_id=str(review.id),
+            publication_id=str(publication.id),
+            actual_diff_hash=branch_working_hash,
+            expected_diff_hash=review.diff_hash,
+            matches=(
+                branch_working_hash
+                == review.diff_hash
+            ),
         )
         assert_hash_matches(
             actual=branch_working_hash,
@@ -869,6 +1010,8 @@ class PublicationService:
         change_set: ChangeSet,
         base_branch: str,
         db: AsyncSession,
+        installation_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
     ) -> Publication:
         publication = Publication(
             workspace_id=review.workspace_id,
@@ -886,6 +1029,9 @@ class PublicationService:
             base_branch=base_branch,
             base_commit_sha=review.base_commit_sha,
             approved_diff_hash=review.diff_hash,
+            installation_id=installation_id,
+            repository_id=repository_id,
+            publication_attempt_id=uuid.uuid4(),
         )
         db.add(
             publication
@@ -1248,6 +1394,8 @@ def serialize_publication(
         "error_message": (
             publication.error_message
         ),
+        "failure_stage": publication.failure_stage,
+        "failure_reason": publication.failure_reason,
         "created_at": isoformat(
             publication.created_at
         ),

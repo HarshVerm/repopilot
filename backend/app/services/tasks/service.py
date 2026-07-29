@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_run import AgentRun
@@ -21,6 +22,7 @@ from app.observability.correlation import (
 )
 from app.observability.logging import (
     log_task_event,
+    log_task_failure,
 )
 from app.observability.redaction import (
     bounded_metadata,
@@ -79,6 +81,14 @@ class TaskService:
         issue_number: int,
         db: AsyncSession,
         reuse_active: bool = True,
+        user_id: uuid.UUID | None = None,
+        installation_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
+        issue_snapshot: dict[str, Any] | None = None,
+        issue_summary: str | None = None,
+        user_instructions: str | None = None,
+        base_branch: str | None = None,
+        autonomy_mode: str = "strict",
     ) -> RepoPilotTask:
         validate_task_identity(
             owner=owner,
@@ -93,6 +103,8 @@ class TaskService:
                 repo=repo,
                 issue_number=issue_number,
                 db=db,
+                user_id=user_id,
+                repository_id=repository_id,
             )
 
         if existing is not None:
@@ -112,6 +124,9 @@ class TaskService:
             UTC
         )
         task = RepoPilotTask(
+            user_id=user_id,
+            installation_id=installation_id,
+            repository_id=repository_id,
             repository_owner=owner,
             repository_name=repo,
             issue_number=issue_number,
@@ -121,15 +136,103 @@ class TaskService:
             ),
             started_at=now,
             last_event_at=now,
+            github_issue_id=(
+                int(issue_snapshot["id"])
+                if issue_snapshot
+                and issue_snapshot.get("id") is not None
+                else None
+            ),
+            issue_title=(
+                issue_snapshot.get("title")
+                if issue_snapshot
+                else None
+            ),
+            issue_body_snapshot=(
+                issue_snapshot.get("body")
+                if issue_snapshot
+                else None
+            ),
+            issue_url=(
+                issue_snapshot.get("html_url")
+                if issue_snapshot
+                else None
+            ),
+            issue_author=(
+                (issue_snapshot.get("user") or {}).get("login")
+                if issue_snapshot
+                else None
+            ),
+            issue_labels=(
+                [
+                    (
+                        label.get("name")
+                        if isinstance(label, dict)
+                        else str(label)
+                    )
+                    for label in issue_snapshot.get("labels", [])
+                ]
+                if issue_snapshot
+                else []
+            ),
+            issue_created_at=parse_github_datetime(
+                issue_snapshot.get("created_at")
+                if issue_snapshot
+                else None
+            ),
+            issue_updated_at_at_creation=parse_github_datetime(
+                issue_snapshot.get("updated_at")
+                if issue_snapshot
+                else None
+            ),
+            issue_summary=issue_summary,
+            user_instructions=user_instructions,
+            base_branch=base_branch,
+            autonomy_mode=autonomy_mode,
         )
         db.add(task)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            if (
+                reuse_active
+                and user_id is not None
+                and repository_id is not None
+            ):
+                concurrent = await self.find_active_task(
+                    owner=owner,
+                    repo=repo,
+                    issue_number=issue_number,
+                    db=db,
+                    user_id=user_id,
+                    repository_id=repository_id,
+                )
+                if concurrent is not None:
+                    await self.record_event(
+                        task_id=concurrent.id,
+                        event_type="task.duplicate_returned",
+                        db=db,
+                        metadata={
+                            "repository": f"{owner}/{repo}",
+                            "issue_number": issue_number,
+                            "reason": "concurrent_create",
+                        },
+                        commit=True,
+                    )
+                    return concurrent
+            raise
         self.add_event(
             task=task,
             event_type="task.created",
             metadata={
                 "repository": f"{owner}/{repo}",
                 "issue_number": issue_number,
+                "repository_id": (
+                    str(repository_id)
+                    if repository_id
+                    else None
+                ),
+                "autonomy_mode": autonomy_mode,
             },
             db=db,
         )
@@ -147,8 +250,14 @@ class TaskService:
         issue_number: int | None = None,
         limit: int = 50,
         offset: int = 0,
+        user_id: uuid.UUID | None = None,
     ) -> list[RepoPilotTask]:
         stmt = select(RepoPilotTask)
+        stmt = stmt.where(
+            RepoPilotTask.user_id == user_id
+            if user_id is not None
+            else RepoPilotTask.user_id.is_(None)
+        )
 
         if status:
             stmt = stmt.where(
@@ -190,6 +299,24 @@ class TaskService:
             task_id,
         )
 
+    async def get_user_task(
+        self,
+        *,
+        task_id: uuid.UUID,
+        user_id: uuid.UUID | None,
+        db: AsyncSession,
+    ) -> RepoPilotTask | None:
+        return await db.scalar(
+            select(RepoPilotTask).where(
+                RepoPilotTask.id == task_id,
+                (
+                    RepoPilotTask.user_id == user_id
+                    if user_id is not None
+                    else RepoPilotTask.user_id.is_(None)
+                ),
+            )
+        )
+
     async def require_task(
         self,
         *,
@@ -215,6 +342,8 @@ class TaskService:
         repo: str,
         issue_number: int,
         db: AsyncSession,
+        user_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
     ) -> RepoPilotTask | None:
         result = await db.scalars(
             select(RepoPilotTask)
@@ -224,6 +353,16 @@ class TaskService:
                 RepoPilotTask.repository_name == repo,
                 RepoPilotTask.issue_number
                 == issue_number,
+                (
+                    RepoPilotTask.user_id == user_id
+                    if user_id is not None
+                    else RepoPilotTask.user_id.is_(None)
+                ),
+                (
+                    RepoPilotTask.repository_id == repository_id
+                    if repository_id is not None
+                    else True
+                ),
                 RepoPilotTask.status.not_in(
                     list(TERMINAL_STATES)
                 ),
@@ -298,6 +437,10 @@ class TaskService:
 
         if task.workspace_id is None:
             task.workspace_id = workspace_id
+            # ``transition_task`` refreshes the task before applying the next
+            # state. Flush the attachment first so that refresh cannot discard
+            # the in-memory workspace ID.
+            await db.flush()
 
         if task.status == CREATED:
             await self.transition_task(
@@ -360,12 +503,14 @@ class TaskService:
         active_review_id: uuid.UUID | None = None,
         publication_id: uuid.UUID | None = None,
         allow_reconcile: bool = False,
+        clear_failure: bool = False,
     ) -> RepoPilotTask:
         task = await self.require_task(
             task_id=task_id,
             db=db,
         )
         await db.refresh(task)
+        previous_status = task.status
 
         if (
             expected_version is not None
@@ -389,30 +534,46 @@ class TaskService:
         now = datetime.now(
             UTC
         )
+        previous_step = task.current_step
         changed_status = (
             task.status != new_status
         )
         task.status = new_status
         task.current_step = (
-            self.state_machine.step_for_status(
+            previous_step
+            if new_status in {
+                FAILED,
+                CANCELLED,
+            }
+            else self.state_machine.step_for_status(
                 new_status
             )
         )
         task.version += 1
         task.last_event_at = now
 
+        if clear_failure:
+            task.last_error = None
+            task.last_error_type = None
+            task.failure_category = None
+            task.retryable = None
+            task.completed_at = None
+
         if new_status in TERMINAL_STATES:
             task.completed_at = (
                 task.completed_at or now
             )
+        if new_status == CANCELLED:
+            task.cancelled_at = task.cancelled_at or now
 
+        normalized_failure_category = None
         if failure_category is not None:
-            normalized = normalize_failure_category(
+            normalized_failure_category = normalize_failure_category(
                 failure_category
             )
-            task.failure_category = normalized
+            task.failure_category = normalized_failure_category
             task.retryable = retryable_for_category(
-                normalized
+                normalized_failure_category
             )
 
         if last_error is not None:
@@ -437,6 +598,34 @@ class TaskService:
         if publication_id is not None:
             task.publication_id = publication_id
 
+        transition_metadata = dict(
+            metadata or {}
+        )
+        transition_metadata.setdefault(
+            "previous_status",
+            previous_status,
+        )
+        transition_metadata.setdefault(
+            "new_status",
+            new_status,
+        )
+        if clear_failure:
+            transition_metadata[
+                "previous_failure_cleared"
+            ] = True
+        if normalized_failure_category is not None:
+            transition_metadata[
+                "failure_category"
+            ] = normalized_failure_category
+        if last_error_type is not None:
+            transition_metadata[
+                "error_type"
+            ] = last_error_type
+        if last_error is not None:
+            transition_metadata[
+                "error_message"
+            ] = task.last_error
+
         self.add_event(
             task=task,
             event_type=event_type
@@ -445,8 +634,15 @@ class TaskService:
                 if changed_status
                 else "task.event"
             ),
-            metadata=metadata,
-            message=message,
+            metadata=transition_metadata,
+            message=(
+                message
+                or (
+                    task.last_error
+                    if last_error is not None
+                    else None
+                )
+            ),
             db=db,
         )
         await db.commit()
@@ -460,19 +656,41 @@ class TaskService:
         db: AsyncSession,
         failure_category: str,
         error: Exception | str,
+        public_message: str | None = None,
         event_type: str = "task.failed",
         metadata: dict[str, Any] | None = None,
     ) -> RepoPilotTask:
         message = (
-            str(error)
-            if isinstance(error, str)
-            else error.__class__.__name__
+            public_message
+            or (
+                str(error)
+                if isinstance(error, str)
+                else error.__class__.__name__
+            )
         )
         error_type = (
             None
             if isinstance(error, str)
             else error.__class__.__name__
         )
+        log_fields = {
+            "task_id": str(task_id),
+            "failure_category": failure_category,
+            "public_message": message,
+            "metadata": metadata or {},
+        }
+        if isinstance(error, BaseException):
+            log_task_failure(
+                event_type,
+                error,
+                **log_fields,
+            )
+        else:
+            log_task_event(
+                event_type,
+                **log_fields,
+                error_message=error,
+            )
         return await self.transition_task(
             task_id=task_id,
             new_status=FAILED,
@@ -607,6 +825,24 @@ class TaskService:
                 debug_attempt_id
             )
 
+        event_metadata = {
+            **(metadata or {}),
+            "agent_run_id": str(agent_run.id),
+            "agent_type": agent_run.agent_type,
+            "model": agent_run.model,
+            "latency_ms": latency_ms,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "tool_calls_count": tool_calls_count,
+        }
+        if error_type is not None:
+            event_metadata["error_type"] = error_type
+        if error_message is not None:
+            event_metadata[
+                "error_message"
+            ] = redact_string(error_message)
+
         await self.record_event(
             task_id=agent_run.task_id,
             event_type=(
@@ -615,7 +851,12 @@ class TaskService:
                 else f"{agent_run.agent_type}.failed"
             ),
             agent_run_id=agent_run.id,
-            metadata=metadata,
+            metadata=event_metadata,
+            message=(
+                error_message
+                if status != "completed"
+                else None
+            ),
             db=db,
             commit=False,
         )
@@ -736,6 +977,16 @@ def isoformat(
     return value.isoformat()
 
 
+def parse_github_datetime(
+    value: str | datetime | None,
+) -> datetime | None:
+    if value is None or isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(
+        value.replace("Z", "+00:00")
+    )
+
+
 def serialize_task(
     task: RepoPilotTask,
     *,
@@ -747,7 +998,35 @@ def serialize_task(
             "owner": task.repository_owner,
             "repo": task.repository_name,
         },
+        "repository_id": (
+            str(task.repository_id)
+            if task.repository_id
+            else None
+        ),
+        "installation_id": (
+            str(task.installation_id)
+            if task.installation_id
+            else None
+        ),
         "issue_number": task.issue_number,
+        "issue": {
+            "github_issue_id": task.github_issue_id,
+            "number": task.issue_number,
+            "title": task.issue_title,
+            "body": task.issue_body_snapshot,
+            "html_url": task.issue_url,
+            "author": task.issue_author,
+            "labels": task.issue_labels or [],
+            "created_at": isoformat(task.issue_created_at),
+            "updated_at_at_creation": isoformat(
+                task.issue_updated_at_at_creation
+            ),
+        },
+        "issue_summary": task.issue_summary,
+        "user_instructions": task.user_instructions,
+        "autonomy_mode": task.autonomy_mode,
+        "base_branch": task.base_branch,
+        "base_commit_sha": task.base_commit_sha,
         "workspace_id": task.workspace_id,
         "status": task.status,
         "current_step": task.current_step,
@@ -755,6 +1034,7 @@ def serialize_task(
         "completed_at": isoformat(
             task.completed_at
         ),
+        "cancelled_at": isoformat(task.cancelled_at),
         "last_error": task.last_error,
         "last_error_type": task.last_error_type,
         "failure_category": task.failure_category,
@@ -814,6 +1094,32 @@ def serialize_timeline_event(
             else None
         ),
         "created_at": isoformat(event.created_at),
+    }
+
+
+def task_issue_snapshot(task: RepoPilotTask) -> dict:
+    """Return the immutable issue payload captured when the task was created."""
+    return {
+        "id": task.github_issue_id,
+        "number": task.issue_number,
+        "title": task.issue_title or "",
+        "body": task.issue_body_snapshot or "",
+        "html_url": task.issue_url,
+        "labels": [
+            {"name": label}
+            for label in (task.issue_labels or [])
+        ],
+        "user": {"login": task.issue_author},
+        "created_at": (
+            task.issue_created_at.isoformat()
+            if task.issue_created_at
+            else None
+        ),
+        "updated_at": (
+            task.issue_updated_at_at_creation.isoformat()
+            if task.issue_updated_at_at_creation
+            else None
+        ),
     }
 
 

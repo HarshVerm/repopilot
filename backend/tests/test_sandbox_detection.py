@@ -11,10 +11,12 @@ from app.services.sandbox.detector import (
 )
 from app.services.sandbox.results import (
     BUILD,
+    EXECUTION_PASSED,
     LINT,
     STATUS_SKIPPED,
     TEST,
     TYPECHECK,
+    overall_status,
 )
 from tests.coding_fixtures import (
     write_file,
@@ -236,6 +238,43 @@ def test_missing_scripts_are_skipped_not_passed(
     assert skipped[TYPECHECK] == STATUS_SKIPPED
     assert skipped[LINT] == STATUS_SKIPPED
     assert BUILD not in skipped
+
+
+def test_repository_without_supported_project_skips_verification(
+    tmp_path: Path,
+):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    write_file(
+        repo,
+        "notes.txt",
+        "plain text repository\n",
+    )
+
+    plan = build_command_plan(
+        detect_project(repo)
+    )
+
+    assert plan.commands == []
+    assert {
+        result.command_type
+        for result in plan.skipped_results
+    } == {
+        TEST,
+        TYPECHECK,
+        LINT,
+        BUILD,
+    }
+    assert all(
+        result.status == STATUS_SKIPPED
+        for result in plan.skipped_results
+    )
+    assert plan.metadata["verification_mode"] == "skipped"
+    assert plan.metadata["verification_reason"]
+    assert (
+        overall_status(plan.skipped_results)
+        == EXECUTION_PASSED
+    )
 
 
 def test_commands_are_argument_lists_not_shell_strings(

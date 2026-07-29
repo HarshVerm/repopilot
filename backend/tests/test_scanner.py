@@ -66,6 +66,34 @@ def test_scanner_indexes_normal_tracked_file(
     assert files[0].size_bytes == len(content)
 
 
+def test_scanner_includes_tracked_text_and_markdown_files(
+    tmp_path: Path,
+):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    write_file(
+        repo,
+        "notes.txt",
+        b"plain text repository context\n",
+    )
+    write_file(
+        repo,
+        "README.md",
+        b"# Repository context\n",
+    )
+    init_git_repo(repo)
+
+    files = {
+        source_file.relative_path: source_file.language
+        for source_file in scan_repository(repo)
+    }
+
+    assert files == {
+        "README.md": "markdown",
+        "notes.txt": "text",
+    }
+
+
 def test_scanner_skips_symlinks_inside_and_outside_repo(
     tmp_path: Path,
     monkeypatch,

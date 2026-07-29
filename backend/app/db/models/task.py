@@ -3,16 +3,20 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import (
+    JSONB,
     UUID,
 )
 from sqlalchemy.orm import (
@@ -34,6 +38,7 @@ TASK_STATUSES = (
     "plan_pending_approval",
     "plan_approved",
     "plan_rejected",
+    "plan_revision_required",
     "coding",
     "patch_generated",
     "testing",
@@ -59,6 +64,22 @@ class RepoPilotTask(Base):
             + str(TASK_STATUSES).replace('"', "'"),
             name="ck_repo_pilot_tasks_status",
         ),
+        CheckConstraint(
+            "autonomy_mode in ('standard', 'strict')",
+            name="ck_repo_pilot_tasks_autonomy_mode",
+        ),
+        Index(
+            "ux_repo_pilot_tasks_native_active_issue",
+            "user_id",
+            "repository_id",
+            "issue_number",
+            unique=True,
+            postgresql_where=text(
+                "user_id is not null and repository_id is not null and "
+                "status not in ('completed', 'plan_rejected', "
+                "'review_rejected', 'failed', 'cancelled')"
+            ),
+        ),
         UniqueConstraint(
             "repository_owner",
             "repository_name",
@@ -73,6 +94,30 @@ class RepoPilotTask(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
+    )
+    installation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "github_installations.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
+    )
+    repository_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "repositories.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
+    )
     repository_owner: Mapped[str] = mapped_column(
         String(100),
         index=True,
@@ -84,6 +129,59 @@ class RepoPilotTask(Base):
     issue_number: Mapped[int] = mapped_column(
         Integer,
         index=True,
+    )
+    github_issue_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        index=True,
+    )
+    issue_title: Mapped[str | None] = mapped_column(
+        String(300),
+        nullable=True,
+    )
+    issue_body_snapshot: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    issue_url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    issue_author: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    issue_labels: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+    )
+    issue_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    issue_updated_at_at_creation: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    issue_summary: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    user_instructions: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    base_branch: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    base_commit_sha: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+    autonomy_mode: Mapped[str] = mapped_column(
+        String(20),
+        default="strict",
     )
     workspace_id: Mapped[str | None] = mapped_column(
         String(36),
@@ -104,6 +202,10 @@ class RepoPilotTask(Base):
         nullable=True,
     )
     completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

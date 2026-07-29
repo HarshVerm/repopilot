@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,12 @@ from app.schemas.evaluation import (
 )
 from app.services.hardening.rate_limit import (
     enforce_rate_limit,
+)
+from app.services.auth.service import (
+    AuthContext,
+    auth_error,
+    get_optional_auth_context,
+    validate_csrf_tokens,
 )
 
 
@@ -43,7 +50,17 @@ router = APIRouter(
 )
 async def run_evaluation(
     request: EvaluationRunRequest,
+    http_request: Request,
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
+    authorize_evaluation_api(auth)
+    if auth is not None:
+        validate_csrf_tokens(
+            request=http_request,
+            context=auth,
+        )
     if request.live and not settings.evaluation_mode:
         raise HTTPException(
             status_code=403,
@@ -75,7 +92,11 @@ async def run_evaluation(
 async def get_evaluation_run(
     evaluation_run_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
+    authorize_evaluation_api(auth)
     run = await db.get(
         EvaluationRun,
         evaluation_run_id,
@@ -94,3 +115,17 @@ async def get_evaluation_run(
         status=run.status,
         report=run.report_json,
     )
+
+
+def authorize_evaluation_api(
+    auth: AuthContext | None,
+) -> None:
+    if (
+        auth is None
+        and not settings.allow_legacy_unauthenticated_api
+    ):
+        raise auth_error(
+            status_code=401,
+            code="AUTH_REQUIRED",
+            message="Sign in with GitHub to continue.",
+        )

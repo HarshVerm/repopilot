@@ -55,6 +55,22 @@ class Publication(Base):
         nullable=True,
         index=True,
     )
+    installation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "github_installations.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
+    )
+    repository_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "repositories.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
+    )
 
     review_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(
@@ -170,6 +186,19 @@ class Publication(Base):
     )
 
     error_message: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    publication_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    failure_stage: Mapped[str | None] = mapped_column(
+        String(60),
+        nullable=True,
+    )
+    failure_reason: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )

@@ -14,6 +14,10 @@ from app.services.chunking.chunker import (
     UnsafeRepositoryPathError,
     resolve_safe_repository_file,
 )
+from app.services.changes.policy import (
+    PathPolicyError,
+    validate_creatable_path,
+)
 
 
 class PlanValidationError(ValueError):
@@ -163,15 +167,60 @@ def validate_planned_file(
         )
 
 
+def validate_planned_modification(
+    planned_file: PlannedFile,
+    *,
+    existing_paths: set[str],
+    repository_path: Path,
+) -> None:
+    if planned_file.change_type == "modify":
+        validate_planned_file(
+            planned_file,
+            existing_paths=existing_paths,
+            repository_path=repository_path,
+        )
+        return
+
+    validate_relative_plan_path(
+        planned_file.path
+    )
+
+    if planned_file.path in existing_paths:
+        raise PlanValidationError(
+            "Planner marked an existing file for creation: "
+            f"{planned_file.path}"
+        )
+
+    if planned_file.references:
+        raise PlanValidationError(
+            "A new file cannot contain source references: "
+            f"{planned_file.path}"
+        )
+
+    try:
+        validate_creatable_path(
+            repository_path=repository_path,
+            requested_path=planned_file.path,
+            allowed_files={
+                planned_file.path
+            },
+        )
+    except (OSError, PathPolicyError) as exc:
+        raise PlanValidationError(
+            "Planner proposed an unsafe new file: "
+            f"{planned_file.path} ({exc})"
+        ) from exc
+
+
 def validate_implementation_step(
     step: ImplementationStep,
     *,
-    existing_paths: set[str],
+    allowed_paths: set[str],
 ) -> None:
     for file_path in step.files:
         validate_file_exists(
             file_path,
-            existing_paths,
+            allowed_paths,
         )
 
 
@@ -186,11 +235,6 @@ async def validate_planner_output(
         db,
         workspace_id=workspace_id,
     )
-
-    if not existing_paths:
-        raise PlanValidationError(
-            "Workspace has no indexed repository files"
-        )
 
     if (
         output.needs_more_context
@@ -208,7 +252,34 @@ async def validate_planner_output(
             "confidence must remain conservative when more context is needed"
         )
 
+    modification_paths = [
+        planned_file.path
+        for planned_file in output.files_to_modify
+    ]
+    if len(modification_paths) != len(
+        set(modification_paths)
+    ):
+        raise PlanValidationError(
+            "files_to_modify contains duplicate paths"
+        )
+
+    created_paths = {
+        planned_file.path
+        for planned_file in output.files_to_modify
+        if planned_file.change_type == "create"
+    }
+
+    if not existing_paths and not created_paths:
+        raise PlanValidationError(
+            "Workspace has no indexed repository files and the plan "
+            "does not explicitly create a new file"
+        )
+
     for planned_file in output.files_to_inspect:
+        if planned_file.change_type != "modify":
+            raise PlanValidationError(
+                "files_to_inspect cannot mark files for creation"
+            )
         validate_planned_file(
             planned_file,
             existing_paths=existing_paths,
@@ -216,7 +287,7 @@ async def validate_planner_output(
         )
 
     for planned_file in output.files_to_modify:
-        validate_planned_file(
+        validate_planned_modification(
             planned_file,
             existing_paths=existing_paths,
             repository_path=repository_path,
@@ -225,5 +296,8 @@ async def validate_planner_output(
     for step in output.implementation_steps:
         validate_implementation_step(
             step,
-            existing_paths=existing_paths,
+            allowed_paths=(
+                existing_paths
+                | created_paths
+            ),
         )

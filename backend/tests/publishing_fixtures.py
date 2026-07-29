@@ -45,6 +45,10 @@ from tests.execution_fixtures import (
     seed_generated_change_set,
 )
 
+NEW_FILE_CONTENT = (
+    "This is a new file created by RepoPilot.\n"
+)
+
 
 class PublishingWorkspace:
     def __init__(
@@ -192,7 +196,10 @@ class StaticAuthenticator:
         return self.credentials
 
 
-def prepare_publishing_workspace() -> PublishingWorkspace:
+def prepare_publishing_workspace(
+    *,
+    new_file: bool = False,
+) -> PublishingWorkspace:
     workspace_id = str(
         uuid.uuid4()
     )
@@ -204,6 +211,21 @@ def prepare_publishing_workspace() -> PublishingWorkspace:
     create_node_execution_fixture_repo(
         repo
     )
+    if new_file:
+        run_git(
+            repo,
+            [
+                "checkout",
+                "--",
+                "src/components/SearchBox.tsx",
+            ],
+        )
+        (
+            repo / "test.txt"
+        ).write_text(
+            NEW_FILE_CONTENT,
+            encoding="utf-8",
+        )
     init_bare_remote(
         repo=repo,
         bare_remote=bare_remote,

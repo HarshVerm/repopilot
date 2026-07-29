@@ -2,11 +2,13 @@ import uuid
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    Index,
     Computed,
     ForeignKey,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import (
     TSVECTOR,
@@ -33,6 +35,24 @@ setweight(to_tsvector('simple', coalesce(content, '')), 'C')
 
 class CodeChunk(Base):
     __tablename__ = "code_chunks"
+    __table_args__ = (
+        Index(
+            "ix_code_chunks_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_code_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={
+                "embedding": "vector_cosine_ops",
+            },
+            postgresql_where=text(
+                "embedding IS NOT NULL"
+            ),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

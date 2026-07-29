@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -26,6 +26,10 @@ class PlannedFile(BaseModel):
         min_length=1,
         max_length=500,
     )
+    change_type: Literal[
+        "modify",
+        "create",
+    ] = "modify"
     reason: str = Field(
         min_length=1,
         max_length=1000,

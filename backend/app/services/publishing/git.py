@@ -9,6 +9,7 @@ from typing import Iterator
 
 from app.services.changes.git import (
     GitCommandError,
+    get_git_diff,
 )
 from app.services.publishing.authentication import (
     GitHubCredentials,
@@ -104,12 +105,8 @@ class SafeGitPublisher:
     def working_tree_diff(
         self,
     ) -> str:
-        return self.run(
-            [
-                "diff",
-                "--no-ext-diff",
-                "--unified=3",
-            ]
+        return get_git_diff(
+            self.repository_path
         )
 
     def staged_diff(

@@ -8,7 +8,6 @@ from app.services.changes.diff import (
 )
 from app.services.changes.git import (
     get_base_commit_sha,
-    get_git_status,
 )
 
 
@@ -51,18 +50,6 @@ def validate_workspace_consistency(
     if current_base != change_set.base_commit_sha:
         raise WorkspaceStateMismatchError(
             "Workspace base commit does not match ChangeSet"
-        )
-
-    status = get_git_status(
-        repository_path
-    )
-
-    if any(
-        line.startswith("?? ")
-        for line in status.splitlines()
-    ):
-        raise WorkspaceStateMismatchError(
-            "Workspace has untracked files"
         )
 
     diff_summary = summarize_diff(

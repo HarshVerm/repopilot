@@ -32,6 +32,10 @@ from tests.execution_fixtures import (
     create_node_execution_fixture_repo,
     seed_generated_change_set,
 )
+from tests.coding_fixtures import (
+    run_git,
+    write_file,
+)
 
 
 def file_hash(
@@ -128,6 +132,185 @@ def test_workspace_mismatch_rejects_execution(
                         repository_path=repo,
                         db=db,
                     )
+        finally:
+            await cleanup_execution_workspace(
+                workspace_id
+            )
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_unapproved_untracked_file_rejects_execution(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    create_node_execution_fixture_repo(repo)
+
+    async def run_test():
+        change_set = await seed_generated_change_set(
+            workspace_id=workspace_id,
+            repo=repo,
+        )
+        (
+            repo / "unexpected.txt"
+        ).write_text(
+            "not in the recorded change set\n",
+            encoding="utf-8",
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                with pytest.raises(
+                    WorkspaceStateMismatchError,
+                    match=(
+                        "changed files do not match"
+                    ),
+                ):
+                    await ExecutionService(
+                        sandbox=FakeSandbox(
+                            sandbox_root=tmp_path
+                            / "sandboxes"
+                        )
+                    ).execute_change_set(
+                        change_set_id=change_set.id,
+                        repository_path=repo,
+                        db=db,
+                    )
+        finally:
+            await cleanup_execution_workspace(
+                workspace_id
+            )
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_approved_new_file_can_be_verified(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    create_node_execution_fixture_repo(repo)
+    (
+        repo / "test.txt"
+    ).write_text(
+        "new file created by the approved plan\n",
+        encoding="utf-8",
+    )
+    sandbox = FakeSandbox(
+        sandbox_root=tmp_path / "sandboxes"
+    )
+
+    async def run_test():
+        change_set = await seed_generated_change_set(
+            workspace_id=workspace_id,
+            repo=repo,
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                run = await ExecutionService(
+                    sandbox=sandbox
+                ).execute_change_set(
+                    change_set_id=change_set.id,
+                    repository_path=repo,
+                    db=db,
+                )
+
+                assert run.status == "passed"
+                assert any(
+                    file.path == "test.txt"
+                    and file.before_sha256
+                    == hashlib.sha256(b"").hexdigest()
+                    for file in change_set.files
+                )
+        finally:
+            await cleanup_execution_workspace(
+                workspace_id
+            )
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_plain_text_repository_without_commands_passes_as_skipped(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run_git(
+        repo,
+        ["init", "-q"],
+    )
+    write_file(
+        repo,
+        "age.txt",
+        "1\n",
+    )
+    run_git(
+        repo,
+        ["add", "age.txt"],
+    )
+    run_git(
+        repo,
+        [
+            "-c",
+            "user.name=RepoPilot Test",
+            "-c",
+            "user.email=repopilot@example.com",
+            "commit",
+            "-m",
+            "initial fixture",
+            "-q",
+        ],
+    )
+    write_file(
+        repo,
+        "test.txt",
+        "new file created by the approved plan\n",
+    )
+    sandbox = FakeSandbox(
+        sandbox_root=tmp_path / "sandboxes"
+    )
+
+    async def run_test():
+        change_set = await seed_generated_change_set(
+            workspace_id=workspace_id,
+            repo=repo,
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                run = await ExecutionService(
+                    sandbox=sandbox
+                ).execute_change_set(
+                    change_set_id=change_set.id,
+                    repository_path=repo,
+                    db=db,
+                )
+
+                assert run.status == "passed"
+                assert run.commands_json == []
+                assert sandbox.executed == []
+                assert run.runtime_metadata[
+                    "verification_mode"
+                ] == "skipped"
+                assert run.runtime_metadata[
+                    "verification_reason"
+                ]
+                assert {
+                    result["status"]
+                    for result in run.results_json
+                } == {
+                    STATUS_SKIPPED
+                }
+                assert run.tests_status == STATUS_SKIPPED
+                assert run.typecheck_status == STATUS_SKIPPED
+                assert run.lint_status == STATUS_SKIPPED
+                assert run.build_status == STATUS_SKIPPED
         finally:
             await cleanup_execution_workspace(
                 workspace_id

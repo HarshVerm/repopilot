@@ -15,6 +15,8 @@ def map_repository(data: dict) -> RepositoryResponse:
         clone_url=data["clone_url"],
         language=data.get("language"),
         stars=data["stargazers_count"],
+        archived=data.get("archived", False),
+        disabled=data.get("disabled", False),
     )
 
 
@@ -31,4 +33,7 @@ def map_issue(data: dict) -> IssueResponse:
             label["name"]
             for label in data.get("labels", [])
         ],
+        author=(data.get("user") or {}).get("login"),
+        created_at=data.get("created_at"),
+        updated_at=data.get("updated_at"),
     )

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,9 +12,28 @@ ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 class Settings(BaseSettings):
     app_name: str = "RepoPilot"
     app_env: str = "development"
+    task_log_level: str = "INFO"
 
     github_token: str | None = None
+    github_app_id: str | None = None
+    github_app_private_key: str | None = None
+    github_app_private_key_path: Path | None = None
+    github_app_client_id: str | None = None
+    github_app_client_secret: str | None = None
+    github_app_slug: str | None = None
     openai_api_key: str | None = None
+
+    app_base_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:3000"
+    session_secret: str = "development-only-change-me"
+    session_cookie_name: str = "repopilot_session"
+    csrf_cookie_name: str = "repopilot_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    cookie_domain: str | None = None
+    session_expiry_hours: int = 168
+    oauth_state_expiry_minutes: int = 10
+    cookie_secure: bool = False
+    allow_legacy_unauthenticated_api: bool = True
 
     database_url: str = (
         "postgresql+asyncpg://repopilot:repopilot@localhost:5432/repopilot"
@@ -180,6 +200,8 @@ class Settings(BaseSettings):
             "evaluation_max_tasks",
             "evaluation_max_concurrency",
             "evaluation_task_timeout_seconds",
+            "session_expiry_hours",
+            "oauth_state_expiry_minutes",
         )
 
         for field_name in positive_int_fields:
@@ -252,6 +274,30 @@ class Settings(BaseSettings):
             self.planner_trace_include_sensitive_data = True
             self.coder_trace_include_sensitive_data = True
             self.debugger_trace_include_sensitive_data = True
+
+        if self.app_env == "production":
+            self.cookie_secure = True
+            self.allow_legacy_unauthenticated_api = False
+            if (
+                self.session_secret
+                == "development-only-change-me"
+                or len(self.session_secret) < 32
+            ):
+                raise ValueError(
+                    "SESSION_SECRET must be at least 32 characters in production"
+                )
+            app_host = urlparse(self.app_base_url).hostname
+            frontend_host = urlparse(self.frontend_url).hostname
+            if (
+                app_host
+                and frontend_host
+                and app_host != frontend_host
+                and not self.cookie_domain
+            ):
+                raise ValueError(
+                    "COOKIE_DOMAIN is required when APP_BASE_URL and "
+                    "FRONTEND_URL use different production hosts"
+                )
 
         return self
 

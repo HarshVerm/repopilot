@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +31,12 @@ from app.services.hardening.rate_limit import (
 from app.services.tasks.locking import (
     TaskOperationConflict,
 )
+from app.services.auth.authorization import authorize_task
+from app.services.auth.service import (
+    AuthContext,
+    get_optional_auth_context,
+    validate_csrf_tokens,
+)
 
 
 router = APIRouter(
@@ -54,7 +61,11 @@ def get_sandbox_runtime():
 )
 async def execute_change_set(
     change_set_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
     sandbox=Depends(get_sandbox_runtime),
 ):
     try:
@@ -70,6 +81,16 @@ async def execute_change_set(
             raise HTTPException(
                 status_code=404,
                 detail="ChangeSet not found",
+            )
+        await authorize_task(
+            task_id=change_set.task_id,
+            auth=auth,
+            db=db,
+        )
+        if auth is not None:
+            validate_csrf_tokens(
+                request=request,
+                context=auth,
             )
 
         repository_path = (
@@ -112,6 +133,9 @@ async def execute_change_set(
 async def get_execution_run(
     execution_run_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
     run = await ExecutionService().get_execution_run(
         execution_run_id=execution_run_id,
@@ -123,6 +147,11 @@ async def get_execution_run(
             status_code=404,
             detail="ExecutionRun not found",
         )
+    await authorize_task(
+        task_id=run.task_id,
+        auth=auth,
+        db=db,
+    )
 
     return serialize_execution_run(
         run

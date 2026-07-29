@@ -1,7 +1,15 @@
 import asyncio
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
+from app.services.publishing.authentication import (
+    GitHubCredentials,
+)
+from app.services.publishing.git import (
+    credential_env,
+    sanitize_error,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
@@ -13,9 +21,12 @@ class WorkspaceManager:
     async def clone_repository(
         self,
         repository_url: str,
+        *,
+        workspace_id: str | None = None,
+        credentials: GitHubCredentials | None = None,
     ) -> tuple[str, Path]:
 
-        workspace_id = str(uuid4())
+        workspace_id = workspace_id or str(uuid4())
 
         workspace_path = (
             WORKSPACES_DIR
@@ -32,22 +43,34 @@ class WorkspaceManager:
             exist_ok=False,
         )
 
-        process = await asyncio.create_subprocess_exec(
-            "git",
-            "clone",
-            "--depth",
-            "1",
-            repository_url,
-            str(repository_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        with credential_env(credentials) as (
+            env,
+            secrets,
+        ):
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                repository_url,
+                str(repository_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
 
-        stdout, stderr = await process.communicate()
+            _, stderr = await process.communicate()
 
         if process.returncode != 0:
+            shutil.rmtree(
+                workspace_path,
+                ignore_errors=True,
+            )
             raise RuntimeError(
-                stderr.decode()
+                sanitize_error(
+                    stderr.decode(),
+                    secrets=secrets,
+                )
             )
 
         return (

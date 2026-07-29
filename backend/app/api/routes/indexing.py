@@ -7,6 +7,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
 )
 
 from sqlalchemy import select
@@ -34,6 +35,12 @@ from app.services.tasks.state_machine import (
     INDEXED,
     INDEXING,
     TaskTransitionError,
+)
+from app.services.auth.authorization import authorize_task
+from app.services.auth.service import (
+    AuthContext,
+    get_optional_auth_context,
+    validate_csrf_tokens,
 )
 
 router = APIRouter(
@@ -73,7 +80,11 @@ def escape_like_query(
 )
 async def create_index(
     workspace_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
 
     repository_path = (
@@ -93,6 +104,16 @@ async def create_index(
         workspace_id=str(workspace_id),
         db=db,
     )
+    await authorize_task(
+        task_id=task.id if task else None,
+        auth=auth,
+        db=db,
+    )
+    if auth is not None:
+        validate_csrf_tokens(
+            request=request,
+            context=auth,
+        )
 
     try:
         if task is not None:
@@ -183,7 +204,19 @@ async def search_symbols(
         ),
     ] = 20,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
+    task = await TaskService().find_task_by_workspace(
+        workspace_id=str(workspace_id),
+        db=db,
+    )
+    await authorize_task(
+        task_id=task.id if task else None,
+        auth=auth,
+        db=db,
+    )
     query = q.strip()
 
     if not query:

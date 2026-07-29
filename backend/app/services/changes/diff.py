@@ -7,6 +7,10 @@ from app.services.changes.git import (
     get_file_at_head,
     get_git_diff,
     get_numstat,
+    get_untracked_files,
+)
+from app.services.chunking.chunker import (
+    resolve_safe_repository_file,
 )
 
 
@@ -42,15 +46,25 @@ def summarize_diff(
     numstat = get_numstat(
         repository_path
     )
+    untracked_files = set(
+        get_untracked_files(
+            repository_path
+        )
+    )
     files: list[ChangedFileMetadata] = []
 
     for path in changed_files:
-        before_content = get_file_at_head(
+        before_content = (
+            b""
+            if path in untracked_files
+            else get_file_at_head(
+                repository_path,
+                path,
+            )
+        )
+        after_content = resolve_safe_repository_file(
             repository_path,
             path,
-        )
-        after_content = (
-            repository_path / path
         ).read_bytes()
         added, deleted = numstat.get(
             path,

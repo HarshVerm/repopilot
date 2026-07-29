@@ -12,6 +12,13 @@ from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
 from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.final_review import FinalReview
+from app.db.models.identity import (
+    GitHubInstallation,
+    OAuthState,
+    Repository,
+    User,
+    UserSession,
+)
 from app.db.models.publication import Publication
 from app.db.models.evaluation_run import EvaluationRun
 from app.db.models.evaluation_task_result import (
@@ -35,9 +42,14 @@ __all__ = [
     "EvaluationRun",
     "EvaluationTaskResult",
     "FinalReview",
+    "GitHubInstallation",
+    "OAuthState",
     "Publication",
     "RepoPilotTask",
+    "Repository",
     "RepositoryFile",
     "TaskEvent",
     "TaskOperationLock",
+    "User",
+    "UserSession",
 ]

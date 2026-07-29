@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from app.api.routes.github import (
     router as github_router,
 )
+from app.api.routes.auth import (
+    router as auth_router,
+)
 
 from app.api.routes.workspaces import (
     router as workspace_router,
@@ -55,6 +58,10 @@ from app.api.routes.evaluation import (
 
 api_router = APIRouter(
     prefix="/api/v1"
+)
+
+api_router.include_router(
+    auth_router
 )
 
 api_router.include_router(

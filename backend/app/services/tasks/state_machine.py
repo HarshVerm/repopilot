@@ -11,6 +11,7 @@ PLANNING = "planning"
 PLAN_PENDING_APPROVAL = "plan_pending_approval"
 PLAN_APPROVED = "plan_approved"
 PLAN_REJECTED = "plan_rejected"
+PLAN_REVISION_REQUIRED = "plan_revision_required"
 CODING = "coding"
 PATCH_GENERATED = "patch_generated"
 TESTING = "testing"
@@ -37,6 +38,7 @@ CURRENT_STEP_BY_STATUS = {
     PLAN_PENDING_APPROVAL: 5,
     PLAN_APPROVED: 5,
     PLAN_REJECTED: 5,
+    PLAN_REVISION_REQUIRED: 5,
     CODING: 6,
     PATCH_GENERATED: 6,
     TESTING: 7,
@@ -72,6 +74,7 @@ CANCELLABLE_STATES = {
     PLANNING,
     PLAN_PENDING_APPROVAL,
     PLAN_APPROVED,
+    PLAN_REVISION_REQUIRED,
     CODING,
     PATCH_GENERATED,
     TESTING,
@@ -120,6 +123,7 @@ VALID_TRANSITIONS = {
     },
     PLANNING: {
         PLAN_PENDING_APPROVAL,
+        PLAN_REVISION_REQUIRED,
         FAILED,
         CANCELLED,
     },
@@ -130,11 +134,13 @@ VALID_TRANSITIONS = {
     },
     PLAN_APPROVED: {
         CODING,
+        PLAN_REVISION_REQUIRED,
         FAILED,
         CANCELLED,
     },
     CODING: {
         PATCH_GENERATED,
+        PLAN_REVISION_REQUIRED,
         FAILED,
         CANCELLED,
     },
@@ -157,6 +163,7 @@ VALID_TRANSITIONS = {
     DEBUGGING: {
         TESTING,
         VERIFICATION_PASSED,
+        PLAN_REVISION_REQUIRED,
         FAILED,
         CANCELLED,
     },
@@ -168,9 +175,11 @@ VALID_TRANSITIONS = {
     REVIEW_PENDING: {
         REVIEW_APPROVED,
         REVIEW_REJECTED,
+        CODING,
         CANCELLED,
     },
     REVIEW_APPROVED: {
+        REVIEW_PENDING,
         PUBLISHING,
         FAILED,
         CANCELLED,
@@ -181,6 +190,10 @@ VALID_TRANSITIONS = {
     },
     COMPLETED: set(),
     PLAN_REJECTED: set(),
+    PLAN_REVISION_REQUIRED: {
+        PLANNING,
+        CANCELLED,
+    },
     REVIEW_REJECTED: set(),
     FAILED: set(),
     CANCELLED: set(),
@@ -200,6 +213,7 @@ STATE_ORDER = {
             PLANNING,
             PLAN_PENDING_APPROVAL,
             PLAN_APPROVED,
+            PLAN_REVISION_REQUIRED,
             CODING,
             PATCH_GENERATED,
             TESTING,
@@ -264,6 +278,7 @@ class TaskStateMachine:
             COMPLETED,
             CANCELLED,
             PLAN_REJECTED,
+            PLAN_REVISION_REQUIRED,
             REVIEW_REJECTED,
         }:
             raise TaskTransitionError(

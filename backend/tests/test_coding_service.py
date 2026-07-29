@@ -22,7 +22,9 @@ from app.db.session import (
 )
 from app.schemas.changes import (
     CoderOutput,
+    FileChange,
 )
+from app.schemas.planning import PlannedFile
 from app.services.changes.git import (
     DirtyWorkspaceError,
     get_git_status,
@@ -82,6 +84,7 @@ async def seed_plan(
     workspace_id: str,
     status: str = "approved",
     files_to_modify: list[str] | None = None,
+    files_to_create: list[str] | None = None,
 ) -> ExecutionPlan:
     output = valid_planner_output()
 
@@ -98,6 +101,16 @@ async def seed_plan(
             for path in files_to_modify
             if path in planned_files_by_path
         ]
+
+    for path in files_to_create or []:
+        output.files_to_modify.append(
+            PlannedFile(
+                path=path,
+                change_type="create",
+                reason="The approved plan requires a new file.",
+                references=[],
+            )
+        )
 
     async with AsyncSessionLocal() as db:
         plan = ExecutionPlan(
@@ -185,6 +198,80 @@ def test_approved_plan_generates_changeset_and_leaves_approved_diff(
                 repo / "src/components/SearchBox.tsx"
             ).read_text(encoding="utf-8")
             assert "src/components/SearchBox.tsx" in git_status(
+                repo
+            )
+        finally:
+            await cleanup_plan(plan.id)
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_approved_plan_can_create_a_scoped_new_file(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    create_coding_fixture_repo(repo)
+
+    def create_file_scenario(editor):
+        editor.create_file(
+            path="test.txt",
+            content="RepoPilot test file\n",
+        )
+        return CoderOutput(
+            summary="Created the explicitly approved test file.",
+            files_changed=[
+                FileChange(
+                    path="test.txt",
+                    change_type="create",
+                    summary="Add the requested test fixture.",
+                )
+            ],
+        )
+
+    async def run_test():
+        plan = await seed_plan(
+            workspace_id=workspace_id,
+            files_to_modify=[],
+            files_to_create=[
+                "test.txt"
+            ],
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                db_plan = await db.get(
+                    ExecutionPlan,
+                    plan.id,
+                )
+                change_set = await CodingService(
+                    coder_runner=FakeCoderRunner(
+                        create_file_scenario
+                    )
+                ).implement_plan(
+                    plan=db_plan,
+                    repository_path=repo,
+                    issue=ISSUE,
+                    context_pack=CONTEXT_PACK,
+                    db=db,
+                )
+
+                assert change_set.status == "generated"
+                assert change_set.files_changed == 1
+                assert change_set.files[0].path == "test.txt"
+                assert change_set.lines_added == 1
+                assert "new file mode" in (
+                    change_set.diff or ""
+                )
+                assert "RepoPilot test file" in (
+                    change_set.diff or ""
+                )
+
+            assert (
+                repo / "test.txt"
+            ).read_text(encoding="utf-8") == "RepoPilot test file\n"
+            assert "?? test.txt" in git_status(
                 repo
             )
         finally:

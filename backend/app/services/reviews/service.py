@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -60,6 +60,7 @@ PENDING_REVIEW = "pending_review"
 APPROVED = "approved"
 REJECTED = "rejected"
 SUPERSEDED = "superseded"
+CHANGES_REQUESTED = "changes_requested"
 
 
 class ReviewNotEligibleError(ValueError):
@@ -218,6 +219,29 @@ class ReviewService:
             debug_history=debug_history,
         )
 
+        review_version = int(
+            await db.scalar(
+                select(
+                    func.coalesce(
+                        func.max(FinalReview.review_version),
+                        0,
+                    )
+                ).where(FinalReview.task_id == task_id)
+            )
+            or 0
+        ) + 1
+        if task_id is not None:
+            active_reviews = await db.scalars(
+                select(FinalReview).where(
+                    FinalReview.task_id == task_id,
+                    FinalReview.status.in_(
+                        [PENDING_REVIEW, APPROVED]
+                    ),
+                )
+            )
+            for active_review in active_reviews:
+                active_review.status = SUPERSEDED
+
         review = FinalReview(
             workspace_id=change_set.workspace_id,
             task_id=task_id,
@@ -225,6 +249,7 @@ class ReviewService:
             change_set_id=change_set.id,
             execution_run_id=execution_run.id,
             status=PENDING_REVIEW,
+            review_version=review_version,
             base_commit_sha=change_set.base_commit_sha,
             diff_hash=current_diff_hash,
             files_changed=len(
@@ -269,16 +294,25 @@ class ReviewService:
         review_id: uuid.UUID,
         repository_path: Path,
         db: AsyncSession,
+        reviewed_by_user_id: uuid.UUID | None = None,
+        expected_change_set_id: uuid.UUID | None = None,
+        expected_diff_hash: str | None = None,
     ) -> FinalReview:
         review = await self.load_review(
             review_id,
             db,
+            for_update=True,
         )
 
         if review.status != PENDING_REVIEW:
             raise ReviewStateError(
                 "Only pending reviews can be approved"
             )
+        self.validate_expected_review(
+            review=review,
+            expected_change_set_id=expected_change_set_id,
+            expected_diff_hash=expected_diff_hash,
+        )
 
         try:
             await self.revalidate_review_integrity(
@@ -307,6 +341,9 @@ class ReviewService:
         review.reviewed_at = datetime.now(
             UTC
         )
+        review.reviewed_by_user_id = (
+            reviewed_by_user_id
+        )
         await db.commit()
         await db.refresh(review)
 
@@ -330,16 +367,25 @@ class ReviewService:
         review_id: uuid.UUID,
         rejection_reason: str | None,
         db: AsyncSession,
+        reviewed_by_user_id: uuid.UUID | None = None,
+        expected_change_set_id: uuid.UUID | None = None,
+        expected_diff_hash: str | None = None,
     ) -> FinalReview:
         review = await self.load_review(
             review_id,
             db,
+            for_update=True,
         )
 
         if review.status != PENDING_REVIEW:
             raise ReviewStateError(
                 "Only pending reviews can be rejected"
             )
+        self.validate_expected_review(
+            review=review,
+            expected_change_set_id=expected_change_set_id,
+            expected_diff_hash=expected_diff_hash,
+        )
 
         review.status = REJECTED
         review.decision = REJECTED
@@ -348,6 +394,9 @@ class ReviewService:
         )
         review.reviewed_at = datetime.now(
             UTC
+        )
+        review.reviewed_by_user_id = (
+            reviewed_by_user_id
         )
         await db.commit()
         await db.refresh(review)
@@ -367,6 +416,93 @@ class ReviewService:
             )
 
         return review
+
+    async def request_changes(
+        self,
+        *,
+        review_id: uuid.UUID,
+        feedback: str,
+        db: AsyncSession,
+        reviewed_by_user_id: uuid.UUID | None = None,
+        expected_change_set_id: uuid.UUID | None = None,
+        expected_diff_hash: str | None = None,
+    ) -> FinalReview:
+        review = await self.load_review(
+            review_id,
+            db,
+            for_update=True,
+        )
+        if review.status != PENDING_REVIEW:
+            raise ReviewStateError(
+                "Only pending reviews can request changes"
+            )
+        self.validate_expected_review(
+            review=review,
+            expected_change_set_id=expected_change_set_id,
+            expected_diff_hash=expected_diff_hash,
+        )
+        clean_feedback = feedback.strip()
+        if not clean_feedback:
+            raise ReviewStateError(
+                "Review feedback must not be blank"
+            )
+        review.status = CHANGES_REQUESTED
+        review.decision = CHANGES_REQUESTED
+        review.feedback = clean_feedback
+        review.reviewed_at = datetime.now(UTC)
+        review.reviewed_by_user_id = (
+            reviewed_by_user_id
+        )
+        await db.commit()
+        await db.refresh(review)
+
+        if review.task_id is not None:
+            task = await TaskService().require_task(
+                task_id=review.task_id,
+                db=db,
+            )
+            prior = (task.user_instructions or "").strip()
+            feedback_context = (
+                f"Final review feedback (revision "
+                f"{review.review_version}):\n{clean_feedback}"
+            )
+            task.user_instructions = (
+                f"{prior}\n\n{feedback_context}"
+                if prior
+                else feedback_context
+            )[:10_000]
+            await db.commit()
+            await TaskService().transition_task(
+                task_id=review.task_id,
+                new_status="coding",
+                db=db,
+                event_type="review.changes_requested",
+                active_review_id=review.id,
+                metadata={
+                    "review_id": str(review.id),
+                    "review_version": review.review_version,
+                    "feedback": clean_feedback,
+                },
+            )
+        return review
+
+    def validate_expected_review(
+        self,
+        *,
+        review: FinalReview,
+        expected_change_set_id: uuid.UUID | None,
+        expected_diff_hash: str | None,
+    ) -> None:
+        if (
+            expected_change_set_id is not None
+            and review.change_set_id != expected_change_set_id
+        ) or (
+            expected_diff_hash is not None
+            and review.diff_hash != expected_diff_hash
+        ):
+            raise ReviewStateError(
+                "The task changed while it was being reviewed"
+            )
 
     async def revalidate_review_integrity(
         self,
@@ -656,11 +792,19 @@ class ReviewService:
         self,
         review_id: uuid.UUID,
         db: AsyncSession,
+        for_update: bool = False,
     ) -> FinalReview:
-        review = await db.get(
-            FinalReview,
-            review_id,
-        )
+        if for_update:
+            review = await db.scalar(
+                select(FinalReview)
+                .where(FinalReview.id == review_id)
+                .with_for_update()
+            )
+        else:
+            review = await db.get(
+                FinalReview,
+                review_id,
+            )
 
         if review is None:
             raise LookupError(
@@ -968,6 +1112,7 @@ def serialize_final_review(
     return {
         "review_id": str(review.id),
         "status": review.status,
+        "review_version": review.review_version,
         "issue": review.issue_json,
         "plan": review.plan_snapshot_json,
         "changes": {
@@ -1010,6 +1155,7 @@ def serialize_final_review(
         "rejection_reason": (
             review.rejection_reason
         ),
+        "feedback": review.feedback,
     }
 
 
@@ -1026,6 +1172,7 @@ def serialize_review_decision(
         "rejection_reason": (
             review.rejection_reason
         ),
+        "feedback": review.feedback,
     }
 
 

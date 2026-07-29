@@ -61,6 +61,7 @@ from app.services.tasks.state_machine import (
     PLAN_PENDING_APPROVAL,
     PLANNING,
     PUBLISHING,
+    REPOSITORY_PREPARING,
     REPOSITORY_READY,
     RETRIEVING,
     REVIEW_APPROVED,
@@ -183,6 +184,71 @@ def test_task_state_machine_rejects_invalid_transitions():
             current_status=VERIFICATION_PASSED,
             new_status=PUBLISHING,
         )
+
+
+def test_attach_workspace_persists_across_session_refresh():
+    created: list[uuid.UUID] = []
+    workspace_id = str(uuid.uuid4())
+
+    async def run_test():
+        try:
+            async with AsyncSessionLocal() as db:
+                task = await TaskService().create_task(
+                    owner="workspace",
+                    repo=f"repo{uuid.uuid4().hex[:8]}",
+                    issue_number=1,
+                    db=db,
+                )
+                created.append(task.id)
+                attached = await TaskService().attach_workspace(
+                    task_id=task.id,
+                    workspace_id=workspace_id,
+                    db=db,
+                )
+
+                assert attached.workspace_id == workspace_id
+                assert attached.status == REPOSITORY_READY
+                transition_event = (
+                    await db.scalars(
+                        select(TaskEvent)
+                        .where(
+                            TaskEvent.task_id == task.id,
+                            TaskEvent.event_type
+                            == "repository.clone.completed",
+                        )
+                        .limit(1)
+                    )
+                ).one()
+                assert transition_event.metadata_json[
+                    "previous_status"
+                ] == REPOSITORY_PREPARING
+                assert transition_event.metadata_json[
+                    "new_status"
+                ] == REPOSITORY_READY
+                failed = await TaskService().set_failure(
+                    task_id=task.id,
+                    db=db,
+                    failure_category="unknown",
+                    error=RuntimeError(
+                        "test failure"
+                    ),
+                )
+                assert failed.status == "failed"
+                assert failed.current_step == 2
+
+            async with AsyncSessionLocal() as db:
+                persisted = await TaskService().require_task(
+                    task_id=created[0],
+                    db=db,
+                )
+                assert persisted.workspace_id == workspace_id
+        finally:
+            await cleanup_task_records(
+                created
+            )
+            await dispose_engines()
+
+    asyncio.run(run_test())
 
 
 def test_task_service_concurrency_locks_redaction_and_metrics():

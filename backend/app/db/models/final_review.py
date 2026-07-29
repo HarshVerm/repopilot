@@ -5,10 +5,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import (
     JSONB,
@@ -27,12 +29,24 @@ class FinalReview(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status in ('pending_review', 'approved', 'rejected', 'superseded')",
+            "status in ('pending_review', 'approved', 'rejected', "
+            "'changes_requested', 'superseded')",
             name="ck_final_reviews_status",
         ),
         CheckConstraint(
-            "decision is null or decision in ('approved', 'rejected')",
+            "decision is null or decision in "
+            "('approved', 'rejected', 'changes_requested')",
             name="ck_final_reviews_decision",
+        ),
+        Index(
+            "ux_final_reviews_active_exact_diff",
+            "change_set_id",
+            "diff_hash",
+            "base_commit_sha",
+            unique=True,
+            postgresql_where=text(
+                "status in ('pending_review', 'approved')"
+            ),
         ),
     )
 
@@ -54,6 +68,10 @@ class FinalReview(Base):
         ),
         nullable=True,
         index=True,
+    )
+    review_version: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
     )
 
     plan_id: Mapped[uuid.UUID] = mapped_column(
@@ -124,6 +142,18 @@ class FinalReview(Base):
     rejection_reason: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+    feedback: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+        index=True,
     )
 
     reviewed_by: Mapped[str | None] = mapped_column(

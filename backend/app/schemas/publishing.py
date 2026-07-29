@@ -22,6 +22,8 @@ class PublicationResponse(BaseModel):
     pull_request_url: str | None = None
     retry_count: int
     error_message: str | None = None
+    failure_stage: str | None = None
+    failure_reason: str | None = None
     created_at: str | None
     updated_at: str | None
     remote_branch_created_at: str | None = None

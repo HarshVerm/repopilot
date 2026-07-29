@@ -50,6 +50,9 @@ from app.observability.pricing import (
 from app.services.debugging.orchestrator import (
     DebugOrchestrator,
 )
+from app.services.debugging.failure_classifier import (
+    classify_execution_run,
+)
 from app.services.hardening.limits import (
     configuration_snapshot,
 )
@@ -456,7 +459,12 @@ class EvaluationRunner:
             )
             final_run = first_run
 
-            if first_run.status != EXECUTION_PASSED:
+            if (
+                first_run.status != EXECUTION_PASSED
+                and classify_execution_run(
+                    first_run
+                ).eligible
+            ):
                 debug_result = await DebugOrchestrator().debug_execution_run(
                     execution_run_id=first_run.id,
                     repository_path=repository_path,

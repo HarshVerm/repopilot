@@ -5,6 +5,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +51,15 @@ from app.services.tasks.locking import (
 )
 from app.services.tasks.service import (
     TaskService,
+    task_issue_snapshot,
+)
+from app.services.auth.authorization import (
+    authorize_task,
+)
+from app.services.auth.service import (
+    AuthContext,
+    get_optional_auth_context,
+    validate_csrf_tokens,
 )
 
 
@@ -75,7 +85,11 @@ def get_coder_runner():
 )
 async def implement_plan(
     plan_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
     embedding_client=Depends(
         get_embedding_client
     ),
@@ -96,6 +110,16 @@ async def implement_plan(
             status_code=404,
             detail="Plan not found",
         )
+    task = await authorize_task(
+        task_id=plan.task_id,
+        auth=auth,
+        db=db,
+    )
+    if auth is not None:
+        validate_csrf_tokens(
+            request=request,
+            context=auth,
+        )
 
     if plan.status != "approved":
         raise HTTPException(
@@ -115,25 +139,27 @@ async def implement_plan(
             detail="Workspace not found",
         )
 
-    try:
-        issue = await github.get_issue(
-            plan.repository_owner,
-            plan.repository_name,
-            plan.issue_number,
-        )
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail="Issue not found",
+    if task is not None and task.user_id is not None:
+        issue = task_issue_snapshot(task)
+    else:
+        try:
+            issue = await github.get_issue(
+                plan.repository_owner,
+                plan.repository_name,
+                plan.issue_number,
             )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Issue not found",
+                )
 
-        raise HTTPException(
-            status_code=502,
-            detail="GitHub issue retrieval failed",
-        ) from exc
-
-    issue["number"] = plan.issue_number
+            raise HTTPException(
+                status_code=502,
+                detail="GitHub issue retrieval failed",
+            ) from exc
+        issue["number"] = plan.issue_number
     retrieval_started = time.perf_counter()
     retrieval_result = await hybrid_search(
         workspace_id=plan.workspace_id,
@@ -222,6 +248,9 @@ async def implement_plan(
 async def get_change_set_diff(
     change_set_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
     change_set = await CodingService().get_change_set(
         change_set_id=change_set_id,
@@ -233,6 +262,11 @@ async def get_change_set_diff(
             status_code=404,
             detail="ChangeSet not found",
         )
+    await authorize_task(
+        task_id=change_set.task_id,
+        auth=auth,
+        db=db,
+    )
 
     return serialize_change_set_diff(
         change_set

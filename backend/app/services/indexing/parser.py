@@ -30,6 +30,12 @@ LANGUAGES = {
 }
 
 
+def supports_ast_parsing(
+    language_name: str,
+) -> bool:
+    return language_name in LANGUAGES
+
+
 def parse_source(
     language_name: str,
     source: bytes,

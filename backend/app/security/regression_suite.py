@@ -135,7 +135,7 @@ class SecurityRegressionSuite:
             write_file(
                 repo,
                 ".env",
-                "SECRET=fake\n",
+                "SECRET=repopilot-security-sentinel\n",
             )
             write_file(
                 repo,
@@ -291,7 +291,7 @@ class SecurityRegressionSuite:
         self,
     ) -> SecurityRegressionResult:
         key = "REPOPILOT_FAKE_HOST_SECRET"
-        os.environ[key] = "fake-secret"
+        os.environ[key] = "repopilot-security-sentinel"
         try:
             env = safe_container_environment()
             blocked = key not in env

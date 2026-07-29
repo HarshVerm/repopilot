@@ -11,6 +11,9 @@ from agents import (
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.agents.configuration import (
+    configure_openai_agents,
+)
 from app.schemas.planning import PlannerOutput
 
 
@@ -34,7 +37,8 @@ You MUST NOT:
 - push Git branches
 - create pull requests
 - claim code has already been changed
-- invent repository files or symbols
+- claim that a proposed new file already exists
+- invent existing repository files or symbols
 - invent APIs or implementation details unsupported by context
 
 Base conclusions only on:
@@ -44,6 +48,16 @@ Base conclusions only on:
 
 Clearly distinguish observed facts, likely root cause, and assumptions.
 Prefer the smallest change that addresses the issue.
+For every files_to_modify entry, set change_type="modify" for an indexed
+existing file or change_type="create" for a genuinely new file explicitly
+required by the issue. New files must have no source references, must use a
+safe repository-relative path whose parent directory already exists, and must
+not be dependency manifests, secrets, environment files, keys, or certificates.
+When an issue explicitly asks only for a generic "test file" and provides no
+framework or executable-test requirement, interpret it as a minimal plain-text
+test.txt at the repository root. Mark test.txt as change_type="create", record
+the interpretation as an assumption, and do not invent a framework, dependency,
+CI workflow, or edits to unrelated files.
 If evidence is insufficient, set needs_more_context=true and list concrete
 missing context. Do not invent a confident root cause.
 """
@@ -157,6 +171,7 @@ class AgentsPlannerRunner:
         *,
         trace_metadata: dict[str, str],
     ) -> PlannerRunResult:
+        configure_openai_agents()
         started_at = time.perf_counter()
         result = await Runner.run(
             self.agent,

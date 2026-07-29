@@ -15,6 +15,9 @@ from app.agents.coder.instructions import (
     CODER_AGENT_NAME,
     CODER_INSTRUCTIONS,
 )
+from app.agents.configuration import (
+    configure_openai_agents,
+)
 from app.core.config import settings
 from app.schemas.changes import CoderOutput
 from app.services.changes.editor import (
@@ -73,6 +76,30 @@ def create_update_file_tool(
     return update_file
 
 
+def create_new_file_tool(
+    editor: RepoPilotPatchEditor,
+):
+    @function_tool(
+        name_override="create_file",
+        description_override=(
+            "Create one explicitly approved new UTF-8 repository file. "
+            "The parent directory must already exist."
+        ),
+    )
+    async def create_file(
+        path: str,
+        content: str,
+    ) -> dict:
+        """Create an explicitly approved new file with complete contents."""
+
+        return editor.create_file(
+            path=path,
+            content=content,
+        )
+
+    return create_file
+
+
 def create_coder_agent(
     editor: RepoPilotPatchEditor,
 ) -> Agent:
@@ -86,7 +113,10 @@ def create_coder_agent(
         tools=[
             create_update_file_tool(
                 editor
-            )
+            ),
+            create_new_file_tool(
+                editor
+            ),
         ],
         handoffs=[],
         output_type=CoderOutput,
@@ -103,6 +133,7 @@ class AgentsCoderRunner:
         editor: RepoPilotPatchEditor,
         trace_metadata: dict[str, str],
     ) -> CoderRunResult:
+        configure_openai_agents()
         agent = create_coder_agent(
             editor
         )

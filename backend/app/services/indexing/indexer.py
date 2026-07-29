@@ -11,6 +11,7 @@ from app.db.models.code_index import (
 
 from app.services.indexing.parser import (
     parse_source,
+    supports_ast_parsing,
 )
 from app.services.indexing.scanner import (
     calculate_sha256,
@@ -80,26 +81,30 @@ async def index_repository(
             )
             continue
 
-        try:
-            tree = parse_source(
-                source_file.language,
-                source,
-            )
-
-            symbols = extract_symbols(
-                source_file.language,
-                source,
-                tree,
-            )
-        except (RuntimeError, ValueError):
-            files_failed += 1
-            failures.append(
-                file_failure(
-                    source_file.relative_path,
-                    "source file could not be parsed",
+        symbols = []
+        if supports_ast_parsing(
+            source_file.language
+        ):
+            try:
+                tree = parse_source(
+                    source_file.language,
+                    source,
                 )
-            )
-            continue
+
+                symbols = extract_symbols(
+                    source_file.language,
+                    source,
+                    tree,
+                )
+            except (RuntimeError, ValueError):
+                files_failed += 1
+                failures.append(
+                    file_failure(
+                        source_file.relative_path,
+                        "source file could not be parsed",
+                    )
+                )
+                continue
 
         if symbols_indexed + len(symbols) > settings.max_symbol_count:
             raise RepositoryLimitError(

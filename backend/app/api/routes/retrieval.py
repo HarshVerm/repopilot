@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,13 @@ from app.services.retrieval.service import (
     build_retrieval_index,
     hybrid_search,
 )
+from app.services.tasks.service import TaskService
+from app.services.auth.authorization import authorize_task
+from app.services.auth.service import (
+    AuthContext,
+    get_optional_auth_context,
+    validate_csrf_tokens,
+)
 
 
 router = APIRouter(
@@ -42,7 +50,11 @@ def get_embedding_client():
 )
 async def build_retrieval(
     workspace_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
     embedding_client=Depends(
         get_embedding_client
     ),
@@ -57,6 +69,20 @@ async def build_retrieval(
         raise HTTPException(
             status_code=404,
             detail="Workspace not found",
+        )
+    task = await TaskService().find_task_by_workspace(
+        workspace_id=str(workspace_id),
+        db=db,
+    )
+    await authorize_task(
+        task_id=task.id if task else None,
+        auth=auth,
+        db=db,
+    )
+    if auth is not None:
+        validate_csrf_tokens(
+            request=request,
+            context=auth,
         )
 
     result = await build_retrieval_index(
@@ -79,12 +105,30 @@ async def build_retrieval(
 async def search_retrieval(
     workspace_id: UUID,
     request: RetrievalSearchRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
     embedding_client=Depends(
         get_embedding_client
     ),
 ):
     query = request.query.strip()
+    task = await TaskService().find_task_by_workspace(
+        workspace_id=str(workspace_id),
+        db=db,
+    )
+    await authorize_task(
+        task_id=task.id if task else None,
+        auth=auth,
+        db=db,
+    )
+    if auth is not None:
+        validate_csrf_tokens(
+            request=http_request,
+            context=auth,
+        )
 
     if not query:
         raise HTTPException(

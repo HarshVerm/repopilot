@@ -5,6 +5,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +52,7 @@ from app.services.tasks.failures import (
 from app.services.tasks.service import (
     TaskService,
     TaskValidationError,
+    task_issue_snapshot,
 )
 from app.services.tasks.state_machine import (
     CREATED,
@@ -59,6 +61,12 @@ from app.services.tasks.state_machine import (
     REPOSITORY_READY,
     RETRIEVING,
     TaskTransitionError,
+)
+from app.services.auth.authorization import authorize_task
+from app.services.auth.service import (
+    AuthContext,
+    get_optional_auth_context,
+    validate_csrf_tokens,
 )
 
 
@@ -97,7 +105,11 @@ PRE_PLAN_TASK_STATES = {
 async def create_workspace_plan(
     workspace_id: UUID,
     request: CreatePlanRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
     embedding_client=Depends(
         get_embedding_client
     ),
@@ -119,6 +131,27 @@ async def create_workspace_plan(
             status_code=404,
             detail="Workspace not found",
         )
+    workspace_task = await TaskService().find_task_by_workspace(
+        workspace_id=str(workspace_id),
+        db=db,
+    )
+    if workspace_task is not None:
+        await authorize_task(
+            task_id=workspace_task.id,
+            auth=auth,
+            db=db,
+        )
+    else:
+        await authorize_task(
+            task_id=None,
+            auth=auth,
+            db=db,
+        )
+    if auth is not None:
+        validate_csrf_tokens(
+            request=http_request,
+            context=auth,
+        )
 
     repository_match = workspace_matches_repository(
         repository_path=repository_path,
@@ -132,33 +165,54 @@ async def create_workspace_plan(
             detail="Workspace repository does not match requested repository",
         )
 
-    try:
-        issue = await github.get_issue(
-            request.owner,
-            request.repo,
-            request.issue_number,
-        )
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
+    if workspace_task is not None:
+        if (
+            request.owner != workspace_task.repository_owner
+            or request.repo != workspace_task.repository_name
+            or request.issue_number != workspace_task.issue_number
+        ):
             raise HTTPException(
-                status_code=404,
-                detail="Issue not found",
+                status_code=409,
+                detail=(
+                    "Plan request does not match the task's immutable "
+                    "repository and issue snapshot"
+                ),
             )
+        issue = task_issue_snapshot(workspace_task)
+    else:
+        try:
+            issue = await github.get_issue(
+                request.owner,
+                request.repo,
+                request.issue_number,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Issue not found",
+                )
 
-        raise HTTPException(
-            status_code=502,
-            detail="GitHub issue retrieval failed",
-        ) from exc
-
-    issue["number"] = request.issue_number
+            raise HTTPException(
+                status_code=502,
+                detail="GitHub issue retrieval failed",
+            ) from exc
+        issue["number"] = request.issue_number
     task_service = TaskService()
 
     try:
-        task = await task_service.find_active_task(
-            owner=request.owner,
-            repo=request.repo,
-            issue_number=request.issue_number,
-            db=db,
+        task = workspace_task or (
+            await task_service.find_active_task(
+                owner=request.owner,
+                repo=request.repo,
+                issue_number=request.issue_number,
+                db=db,
+                user_id=(
+                    auth.user.id
+                    if auth
+                    else None
+                ),
+            )
         )
 
         if (
@@ -171,6 +225,7 @@ async def create_workspace_plan(
                 repo=request.repo,
                 issue_number=request.issue_number,
                 db=db,
+                issue_snapshot=issue,
                 reuse_active=False,
             )
 
@@ -288,6 +343,9 @@ async def create_workspace_plan(
 async def get_plan(
     plan_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
     plan = await PlannerService().get_plan(
         plan_id=plan_id,
@@ -299,6 +357,11 @@ async def get_plan(
             status_code=404,
             detail="Plan not found",
         )
+    await authorize_task(
+        task_id=plan.task_id,
+        auth=auth,
+        db=db,
+    )
 
     return serialize_plan(plan)
 
@@ -309,9 +372,29 @@ async def get_plan(
 )
 async def approve_plan(
     plan_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
     try:
+        current_plan = await PlannerService().get_plan(
+            plan_id=plan_id,
+            db=db,
+        )
+        if current_plan is None:
+            raise KeyError(plan_id)
+        await authorize_task(
+            task_id=current_plan.task_id,
+            auth=auth,
+            db=db,
+        )
+        if auth is not None:
+            validate_csrf_tokens(
+                request=request,
+                context=auth,
+            )
         plan = await PlannerService().approve_plan(
             plan_id=plan_id,
             db=db,
@@ -340,10 +423,30 @@ async def approve_plan(
 )
 async def reject_plan(
     plan_id: UUID,
+    http_request: Request,
     request: RejectPlanRequest | None = None,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
     try:
+        current_plan = await PlannerService().get_plan(
+            plan_id=plan_id,
+            db=db,
+        )
+        if current_plan is None:
+            raise KeyError(plan_id)
+        await authorize_task(
+            task_id=current_plan.task_id,
+            auth=auth,
+            db=db,
+        )
+        if auth is not None:
+            validate_csrf_tokens(
+                request=http_request,
+                context=auth,
+            )
         plan = await PlannerService().reject_plan(
             plan_id=plan_id,
             reason=(

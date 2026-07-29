@@ -1,14 +1,18 @@
 import asyncio
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
+from app.db.models.change_set import ChangeSet
+from app.db.models.execution_plan import ExecutionPlan
+from app.db.models.execution_run import ExecutionRun
 from app.db.models.final_review import (
     FinalReview,
 )
 from app.db.models.publication import (
     Publication,
 )
+from app.db.models.task import RepoPilotTask
 from app.db.session import AsyncSessionLocal
 from app.services.publishing.authentication import (
     GitHubCredentials,
@@ -23,6 +27,7 @@ from app.services.publishing.github import (
 from app.services.publishing.integrity import (
     CommitDiffMismatchError,
     CommitParentMismatchError,
+    PublicationIntegrityError,
     RepositoryMismatchError,
     ReviewNotApprovedError,
     StagedDiffMismatchError,
@@ -46,6 +51,11 @@ from app.services.reviews.service import (
     SUPERSEDED,
     WorkspaceDriftError,
 )
+from app.services.tasks.state_machine import (
+    COMPLETED,
+    FAILED as TASK_FAILED,
+    REVIEW_APPROVED,
+)
 from tests.coding_fixtures import (
     run_git,
 )
@@ -54,6 +64,7 @@ from tests.execution_fixtures import (
 )
 from tests.publishing_fixtures import (
     FakeGitHubPublisher,
+    NEW_FILE_CONTENT,
     StaticAuthenticator,
     bare_remote_branch_sha,
     bare_remote_branches,
@@ -61,6 +72,178 @@ from tests.publishing_fixtures import (
     prepare_publishing_workspace,
     run_git_capture,
 )
+
+
+def test_publish_success_includes_approved_new_file():
+    workspace = prepare_publishing_workspace(
+        new_file=True
+    )
+    github = FakeGitHubPublisher()
+    service = publication_service(
+        github=github
+    )
+
+    async def run_test():
+        try:
+            async with AsyncSessionLocal() as db:
+                publication = await service.publish_review(
+                    review_id=workspace.review.id,
+                    repository_path=workspace.repo,
+                    db=db,
+                )
+
+                assert publication.status == PUBLISHED
+                assert publication.working_tree_diff_hash == workspace.review.diff_hash
+                assert publication.staged_diff_hash == workspace.review.diff_hash
+                assert publication.commit_diff_hash == workspace.review.diff_hash
+
+            assert run_git_capture(
+                workspace.repo,
+                [
+                    "show",
+                    f"{publication.commit_sha}:test.txt",
+                ],
+            ) == NEW_FILE_CONTENT
+            assert run_git_capture(
+                workspace.repo,
+                [
+                    "status",
+                    "--porcelain",
+                ],
+            ) == ""
+            assert bare_remote_branch_sha(
+                workspace.bare_remote,
+                publication.branch_name,
+            ) == publication.commit_sha
+        finally:
+            await cleanup_publishing_workspace(
+                workspace
+            )
+
+    asyncio.run(
+        run_test()
+    )
+
+
+def test_failed_publication_can_retry_same_approved_task():
+    workspace = prepare_publishing_workspace(
+        new_file=True
+    )
+    github = FakeGitHubPublisher()
+    factory = FailingWorkingDiffOnceFactory()
+    service = publication_service(
+        github=github,
+        git_factory=factory,
+    )
+    task_id = None
+
+    async def run_test():
+        nonlocal task_id
+        try:
+            async with AsyncSessionLocal() as db:
+                plan = await db.get(
+                    ExecutionPlan,
+                    workspace.review.plan_id,
+                )
+                change_set = await db.get(
+                    ChangeSet,
+                    workspace.change_set.id,
+                )
+                execution_run = await db.get(
+                    ExecutionRun,
+                    workspace.execution_run.id,
+                )
+                review = await db.get(
+                    FinalReview,
+                    workspace.review.id,
+                )
+                assert plan is not None
+                assert change_set is not None
+                assert execution_run is not None
+                assert review is not None
+
+                task = RepoPilotTask(
+                    repository_owner="acme",
+                    repository_name="storefront",
+                    issue_number=142,
+                    workspace_id=workspace.workspace_id,
+                    status=REVIEW_APPROVED,
+                    current_step=9,
+                    autonomy_mode="standard",
+                )
+                db.add(task)
+                await db.flush()
+                task_id = task.id
+                plan.task_id = task.id
+                change_set.task_id = task.id
+                execution_run.task_id = task.id
+                review.task_id = task.id
+                task.active_plan_id = plan.id
+                task.active_change_set_id = change_set.id
+                task.active_execution_run_id = execution_run.id
+                task.active_review_id = review.id
+                await db.commit()
+
+                with pytest.raises(
+                    PublicationIntegrityError
+                ):
+                    await service.publish_review(
+                        review_id=review.id,
+                        repository_path=workspace.repo,
+                        db=db,
+                        task_id=task.id,
+                    )
+
+                failed_task = await db.get(
+                    RepoPilotTask,
+                    task.id,
+                )
+                failed_publication = await publication_for_review(
+                    db,
+                    review.id,
+                )
+                assert failed_task is not None
+                assert failed_task.status == TASK_FAILED
+                assert failed_task.retryable is True
+                assert failed_publication.status == FAILED
+
+                retried = await service.publish_review(
+                    review_id=review.id,
+                    repository_path=workspace.repo,
+                    db=db,
+                    task_id=task.id,
+                )
+                completed_task = await db.get(
+                    RepoPilotTask,
+                    task.id,
+                )
+                assert completed_task is not None
+                assert completed_task.status == COMPLETED
+                assert completed_task.last_error is None
+                assert completed_task.last_error_type is None
+                assert completed_task.failure_category is None
+                assert completed_task.retryable is None
+                assert retried.id == failed_publication.id
+                assert retried.status == PUBLISHED
+                assert retried.retry_count == 1
+                assert len(github.created_requests) == 1
+        finally:
+            await cleanup_publishing_workspace(
+                workspace
+            )
+            if task_id is not None:
+                async with AsyncSessionLocal() as db:
+                    await db.execute(
+                        delete(RepoPilotTask).where(
+                            RepoPilotTask.id
+                            == task_id
+                        )
+                    )
+                    await db.commit()
+
+    asyncio.run(
+        run_test()
+    )
 
 
 def test_publish_success_creates_exact_branch_commit_push_and_pr():
@@ -250,6 +433,16 @@ def test_tampering_before_publish_is_blocked_before_branch_creation():
                     db,
                     workspace.review.id,
                 ) == 0
+                invalidated_review = await db.get(
+                    FinalReview,
+                    workspace.review.id,
+                )
+                assert invalidated_review is not None
+                assert (
+                    invalidated_review.status
+                    == PENDING_REVIEW
+                )
+                assert invalidated_review.decision is None
 
             assert bare_remote_branches(
                 workspace.bare_remote
@@ -863,6 +1056,44 @@ class DefaultBranchPublicationService(PublicationService):
         git,
     ) -> str:
         return base_branch
+
+
+class FailingWorkingDiffOnceFactory:
+    def __init__(self) -> None:
+        self.failures = 1
+
+    def __call__(
+        self,
+        path,
+    ) -> SafeGitPublisher:
+        return FailingWorkingDiffOnceGitPublisher(
+            repository_path=path,
+            factory=self,
+        )
+
+
+class FailingWorkingDiffOnceGitPublisher(
+    SafeGitPublisher
+):
+    def __init__(
+        self,
+        *,
+        repository_path,
+        factory: FailingWorkingDiffOnceFactory,
+    ) -> None:
+        super().__init__(
+            repository_path=repository_path
+        )
+        self.factory = factory
+
+    def working_tree_diff(
+        self,
+    ) -> str:
+        if self.factory.failures:
+            self.factory.failures -= 1
+            return ""
+
+        return super().working_tree_diff()
 
 
 class FailingPushFactory:

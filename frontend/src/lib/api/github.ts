@@ -1,0 +1,67 @@
+import type {
+  ConnectedRepositoryListResponse,
+  ConnectedRepositoryResponse,
+  IssueListResponse,
+  IssueResponse,
+} from "@/types/api";
+import { apiRequest } from "./client";
+
+export function listConnectedRepositories(
+  options: {
+    search?: string;
+    page?: number;
+    perPage?: number;
+    includeArchived?: boolean;
+    refresh?: boolean;
+  } = {},
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams();
+  if (options.search) params.set("search", options.search);
+  params.set("page", String(options.page ?? 1));
+  params.set("per_page", String(options.perPage ?? 30));
+  if (options.includeArchived) params.set("include_archived", "true");
+  if (options.refresh) params.set("refresh", "true");
+  return apiRequest<ConnectedRepositoryListResponse>(
+    `/api/v1/github/repositories?${params.toString()}`,
+    { signal },
+  );
+}
+
+export function getConnectedRepository(
+  repositoryId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<ConnectedRepositoryResponse>(
+    `/api/v1/github/repositories/${repositoryId}`,
+    { signal },
+  );
+}
+
+export function listConnectedRepositoryIssues(
+  repositoryId: string,
+  options: { search?: string; page?: number; perPage?: number } = {},
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    state: "open",
+    page: String(options.page ?? 1),
+    per_page: String(options.perPage ?? 30),
+  });
+  if (options.search) params.set("search", options.search);
+  return apiRequest<IssueListResponse>(
+    `/api/v1/github/repositories/${repositoryId}/issues?${params.toString()}`,
+    { signal },
+  );
+}
+
+export function getConnectedRepositoryIssue(
+  repositoryId: string,
+  issueNumber: number,
+  signal?: AbortSignal,
+) {
+  return apiRequest<IssueResponse>(
+    `/api/v1/github/repositories/${repositoryId}/issues/${issueNumber}`,
+    { signal },
+  );
+}

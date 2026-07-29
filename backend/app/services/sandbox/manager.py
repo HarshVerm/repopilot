@@ -14,6 +14,10 @@ from app.db.models.change_set import (
 from app.db.models.execution_run import (
     ExecutionRun,
 )
+from app.observability.logging import (
+    log_task_event,
+    log_task_failure,
+)
 from app.services.sandbox.commands import (
     CommandPlan,
     build_command_plan,
@@ -226,6 +230,42 @@ class ExecutionService:
                     command_plan.skipped_results
                 )
 
+                if (
+                    command_plan.metadata.get(
+                        "verification_mode"
+                    )
+                    == "skipped"
+                ):
+                    log_task_event(
+                        "sandbox.verification_skipped",
+                        task_id=(
+                            str(task_id)
+                            if task_id is not None
+                            else None
+                        ),
+                        change_set_id=str(
+                            change_set.id
+                        ),
+                        execution_run_id=str(
+                            run.id
+                        ),
+                        reason=command_plan.metadata.get(
+                            "verification_reason"
+                        ),
+                        project_types=(
+                            command_plan.metadata.get(
+                                "project_types",
+                                [],
+                            )
+                        ),
+                        skipped_checks=[
+                            result.command_type
+                            for result in (
+                                command_plan.skipped_results
+                            )
+                        ],
+                    )
+
                 results.extend(
                     self.run_commands(
                         handle=handle,
@@ -234,6 +274,18 @@ class ExecutionService:
                     )
                 )
             except Exception as exc:
+                log_task_failure(
+                    "sandbox.execution_failed",
+                    exc,
+                    task_id=(
+                        str(task_id)
+                        if task_id is not None
+                        else None
+                    ),
+                    change_set_id=str(change_set.id),
+                    execution_run_id=str(run.id),
+                    sandbox_runtime=self.sandbox.runtime_name,
+                )
                 run.error_message = sanitize_error(
                     exc
                 )
@@ -432,6 +484,14 @@ def execution_task_metadata(
             "build": run.build_status,
         },
         "timed_out": run.timed_out,
+        "verification": {
+            "mode": (
+                run.runtime_metadata or {}
+            ).get("verification_mode"),
+            "reason": (
+                run.runtime_metadata or {}
+            ).get("verification_reason"),
+        },
     }
 
 

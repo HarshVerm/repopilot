@@ -7,6 +7,9 @@ LANGUAGE_BY_EXTENSION = {
     ".jsx": "javascript",
     ".ts": "typescript",
     ".tsx": "tsx",
+    ".txt": "text",
+    ".md": "markdown",
+    ".markdown": "markdown",
 }
 
 

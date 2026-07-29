@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas.workspace import (
     CloneRepositoryRequest,
@@ -6,6 +6,12 @@ from app.schemas.workspace import (
 )
 from app.services.workspace.manager import (
     workspace_manager,
+)
+from app.core.config import settings
+from app.services.auth.service import (
+    AuthContext,
+    auth_error,
+    get_optional_auth_context,
 )
 
 
@@ -21,7 +27,19 @@ router = APIRouter(
 )
 async def clone_repository(
     request: CloneRepositoryRequest,
+    auth: AuthContext | None = Depends(
+        get_optional_auth_context
+    ),
 ):
+    if auth is not None or not settings.allow_legacy_unauthenticated_api:
+        raise auth_error(
+            status_code=403,
+            code="REPOSITORY_ACCESS_DENIED",
+            message=(
+                "Create a task from an authorized GitHub App repository "
+                "instead of submitting a repository URL."
+            ),
+        )
     try:
         workspace_id, path = (
             await workspace_manager.clone_repository(

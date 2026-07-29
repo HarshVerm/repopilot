@@ -13,6 +13,9 @@ from pydantic import ValidationError
 from app.agents.coder.agent import (
     create_update_file_tool,
 )
+from app.agents.configuration import (
+    configure_openai_agents,
+)
 from app.agents.debugger.instructions import (
     DEBUGGER_AGENT_NAME,
     DEBUGGER_INSTRUCTIONS,
@@ -84,6 +87,7 @@ class AgentsDebuggerRunner:
         editor: RepoPilotPatchEditor,
         trace_metadata: dict[str, str],
     ) -> DebuggerRunResult:
+        configure_openai_agents()
         agent = create_debugger_agent(
             editor
         )

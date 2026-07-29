@@ -10,6 +10,7 @@ from app.services.sandbox.results import (
     LINT,
     TEST,
     TYPECHECK,
+    VERIFICATION_COMMAND_TYPES,
     CommandResult,
     ExecutionCommand,
     skipped_result,
@@ -35,6 +36,11 @@ NODE_CHECK_SCRIPTS = {
     LINT: "lint",
     BUILD: "build",
 }
+
+NO_VERIFICATION_COMMANDS_REASON = (
+    "No supported verification commands were detected "
+    "for this repository"
+)
 
 
 @dataclass(frozen=True)
@@ -68,10 +74,45 @@ def build_command_plan(
             skipped,
         )
 
+    has_verification_commands = any(
+        command.command_type
+        in VERIFICATION_COMMAND_TYPES
+        for command in commands
+    )
+
+    if not detection.project_types:
+        for command_type, name in [
+            (TEST, "repository:test"),
+            (TYPECHECK, "repository:typecheck"),
+            (LINT, "repository:lint"),
+            (BUILD, "repository:build"),
+        ]:
+            skipped.append(
+                skipped_result(
+                    name=name,
+                    command_type=command_type,
+                    reason=NO_VERIFICATION_COMMANDS_REASON,
+                )
+            )
+
+    metadata = {
+        **detection.to_metadata(),
+        "verification_mode": (
+            "commands"
+            if has_verification_commands
+            else "skipped"
+        ),
+        "verification_reason": (
+            None
+            if has_verification_commands
+            else NO_VERIFICATION_COMMANDS_REASON
+        ),
+    }
+
     return CommandPlan(
         commands=commands,
         skipped_results=skipped,
-        metadata=detection.to_metadata(),
+        metadata=metadata,
     )
 
 

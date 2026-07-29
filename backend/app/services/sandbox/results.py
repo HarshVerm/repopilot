@@ -211,6 +211,20 @@ def overall_status(
         in VERIFICATION_COMMAND_TYPES
     ]
 
+    if not verification_results:
+        return EXECUTION_ERROR
+
+    # A generic repository may not declare a supported test,
+    # lint, typecheck, or build command. Keep every individual
+    # check visibly SKIPPED, but allow the workflow to continue
+    # to human final review when there was nothing executable to
+    # verify. Errors and failures still return above.
+    if all(
+        result.status == STATUS_SKIPPED
+        for result in verification_results
+    ):
+        return EXECUTION_PASSED
+
     if not any(
         result.status == STATUS_PASS
         for result in verification_results

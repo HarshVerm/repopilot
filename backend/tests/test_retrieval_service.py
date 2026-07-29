@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -236,6 +237,73 @@ def test_embedding_build_failure_keeps_lexical_index_available(
             assert any(
                 candidate.file_path
                 == "src/utils/debounce.ts"
+                for candidate in lexical
+            )
+        finally:
+            await delete_workspace(
+                workspace_id
+            )
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_plain_text_repository_content_is_retrievable(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "age.txt").write_text(
+        "The configured age value is twenty two.\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            "git",
+            "init",
+            "-q",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "add",
+            ".",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+    async def run_test():
+        try:
+            async with AsyncSessionLocal() as db:
+                index_result = await index_repository(
+                    workspace_id,
+                    repo,
+                    db,
+                )
+                build_result = await build_retrieval_index(
+                    workspace_id=workspace_id,
+                    repository_path=repo,
+                    db=db,
+                    embedding_client=FakeEmbeddingClient(),
+                )
+
+            async with AsyncSessionLocal() as db:
+                lexical = await retrieve_lexical(
+                    db,
+                    workspace_id=workspace_id,
+                    query="configured age value",
+                    limit=10,
+                )
+
+            assert index_result["files_indexed"] == 1
+            assert build_result["chunks_created"] == 1
+            assert any(
+                candidate.file_path == "age.txt"
                 for candidate in lexical
             )
         finally:

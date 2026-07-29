@@ -5,6 +5,9 @@ from app.services.chunking.chunker import (
     UnsafeRepositoryPathError,
     resolve_safe_repository_file,
 )
+from app.services.indexing.scanner import (
+    is_relative_to,
+)
 
 
 class PathPolicyError(ValueError):
@@ -128,3 +131,89 @@ def validate_editable_path(
         )
 
     return resolved_path
+
+
+def validate_creatable_path(
+    *,
+    repository_path: Path,
+    requested_path: str,
+    allowed_files: set[str],
+) -> Path:
+    if "\x00" in requested_path:
+        raise PathPolicyError(
+            "Path contains a null byte"
+        )
+
+    relative_path = Path(requested_path)
+
+    if (
+        relative_path.is_absolute()
+        or ".." in relative_path.parts
+        or not requested_path.strip()
+        or not relative_path.name
+    ):
+        raise PathPolicyError(
+            "Path must be a safe repository-relative path"
+        )
+
+    normalized_path = relative_path.as_posix()
+
+    if normalized_path not in allowed_files:
+        raise PathPolicyError(
+            "Path is outside the approved creation scope"
+        )
+
+    if is_sensitive_path(relative_path):
+        raise PathPolicyError(
+            "Sensitive paths cannot be created"
+        )
+
+    if is_dependency_manifest(relative_path):
+        raise PathPolicyError(
+            "Dependency manifests are protected in Step 6"
+        )
+
+    repository_root = repository_path.resolve(
+        strict=True
+    )
+    candidate_path = (
+        repository_root / relative_path
+    )
+
+    if (
+        candidate_path.exists()
+        or candidate_path.is_symlink()
+    ):
+        raise PathPolicyError(
+            "Approved new file already exists"
+        )
+
+    current_path = repository_root
+    for part in relative_path.parts[:-1]:
+        current_path = current_path / part
+        if current_path.is_symlink():
+            raise PathPolicyError(
+                "New file parent cannot contain a symlink"
+            )
+
+    try:
+        resolved_parent = candidate_path.parent.resolve(
+            strict=True
+        )
+    except OSError as exc:
+        raise PathPolicyError(
+            "New file parent directory does not exist"
+        ) from exc
+
+    if (
+        not is_relative_to(
+            resolved_parent,
+            repository_root,
+        )
+        or not resolved_parent.is_dir()
+    ):
+        raise PathPolicyError(
+            "New file path escapes the repository"
+        )
+
+    return resolved_parent / relative_path.name

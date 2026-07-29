@@ -3,16 +3,21 @@ from typing import Any
 from pydantic import (
     BaseModel,
     Field,
+    model_validator,
 )
+from uuid import UUID
 
 
 class CreateTaskRequest(BaseModel):
-    owner: str = Field(
+    repository_id: UUID | None = None
+    owner: str | None = Field(
+        default=None,
         min_length=1,
         max_length=100,
         pattern=r"^[A-Za-z0-9_.-]+$",
     )
-    repo: str = Field(
+    repo: str | None = Field(
+        default=None,
         min_length=1,
         max_length=100,
         pattern=r"^[A-Za-z0-9_.-]+$",
@@ -20,17 +25,42 @@ class CreateTaskRequest(BaseModel):
     issue_number: int = Field(
         ge=1,
     )
+    user_instructions: str | None = Field(
+        default=None,
+        max_length=10_000,
+    )
+
+    @model_validator(mode="after")
+    def validate_repository_reference(
+        self,
+    ) -> "CreateTaskRequest":
+        native = self.repository_id is not None
+        legacy = self.owner is not None and self.repo is not None
+        if native == legacy:
+            raise ValueError(
+                "Provide repository_id or legacy owner/repo, but not both"
+            )
+        return self
 
 
 class TaskResponse(BaseModel):
     task_id: str
     repository: dict[str, str]
+    repository_id: str | None = None
+    installation_id: str | None = None
     issue_number: int
+    issue: dict[str, Any] | None = None
+    issue_summary: str | None = None
+    user_instructions: str | None = None
+    autonomy_mode: str = "strict"
+    base_branch: str | None = None
+    base_commit_sha: str | None = None
     workspace_id: str | None
     status: str
     current_step: int
     started_at: str | None
     completed_at: str | None
+    cancelled_at: str | None = None
     last_error: str | None
     last_error_type: str | None
     failure_category: str | None
