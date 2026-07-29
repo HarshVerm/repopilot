@@ -11,6 +11,7 @@ from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
 from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.final_review import FinalReview
+from app.db.models.publication import Publication
 
 __all__ = [
     "ChangeSet",
@@ -21,5 +22,6 @@ __all__ = [
     "ExecutionPlan",
     "ExecutionRun",
     "FinalReview",
+    "Publication",
     "RepositoryFile",
 ]

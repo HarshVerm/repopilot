@@ -12,6 +12,7 @@ from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.execution_run import ExecutionRun
 from app.db.models.final_review import FinalReview
+from app.db.models.publication import Publication
 from app.db.session import AsyncSessionLocal
 from app.services.changes.diff import (
     summarize_diff,
@@ -244,6 +245,12 @@ async def cleanup_execution_workspace(
             remaining
         )
 
+        await db.execute(
+            delete(Publication).where(
+                Publication.workspace_id
+                == workspace_id
+            )
+        )
         await db.execute(
             delete(FinalReview).where(
                 FinalReview.workspace_id

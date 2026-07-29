@@ -36,6 +36,10 @@ from app.api.routes.reviews import (
     router as reviews_router,
 )
 
+from app.api.routes.publishing import (
+    router as publishing_router,
+)
+
 
 api_router = APIRouter(
     prefix="/api/v1"
@@ -75,4 +79,8 @@ api_router.include_router(
 
 api_router.include_router(
     reviews_router
+)
+
+api_router.include_router(
+    publishing_router
 )
