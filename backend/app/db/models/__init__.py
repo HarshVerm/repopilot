@@ -8,6 +8,7 @@ from app.db.models.change_set import (
     ChangeSetFile,
 )
 from app.db.models.execution_plan import ExecutionPlan
+from app.db.models.execution_run import ExecutionRun
 
 __all__ = [
     "ChangeSet",
@@ -15,5 +16,6 @@ __all__ = [
     "CodeChunk",
     "CodeSymbol",
     "ExecutionPlan",
+    "ExecutionRun",
     "RepositoryFile",
 ]

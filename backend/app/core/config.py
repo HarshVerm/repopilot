@@ -33,6 +33,22 @@ class Settings(BaseSettings):
     max_total_lines_changed: int = 1000
     max_editable_file_size: int = 2_000_000
 
+    sandbox_root: Path = Path(
+        "/tmp/repopilot-sandboxes"
+    )
+    sandbox_cpu_limit: str = "2"
+    sandbox_memory_limit: str = "2g"
+    sandbox_pids_limit: int = 256
+    sandbox_command_timeout_seconds: int = 600
+    sandbox_overall_timeout_seconds: int = 600
+    sandbox_stdout_max_bytes: int = 1_000_000
+    sandbox_stderr_max_bytes: int = 1_000_000
+    sandbox_node_image: str = "node:20-bookworm-slim"
+    sandbox_python_image: str = "python:3.11-slim"
+    sandbox_container_user: str = "1000:1000"
+    sandbox_install_network: str = "bridge"
+    sandbox_execution_network: str = "none"
+
     max_chunk_tokens: int = 1200
     chunk_overlap_tokens: int = 100
     max_context_tokens: int = 6000
