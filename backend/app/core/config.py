@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     planner_max_turns: int = 4
     planner_trace_include_sensitive_data: bool = False
 
+    coder_model: str = "gpt-5-mini"
+    coder_max_turns: int = 8
+    coder_trace_include_sensitive_data: bool = False
+    max_changed_files: int = 10
+    max_total_lines_changed: int = 1000
+    max_editable_file_size: int = 2_000_000
+
     max_chunk_tokens: int = 1200
     chunk_overlap_tokens: int = 100
     max_context_tokens: int = 6000

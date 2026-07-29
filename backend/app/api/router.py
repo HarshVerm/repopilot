@@ -20,6 +20,10 @@ from app.api.routes.plans import (
     router as plans_router,
 )
 
+from app.api.routes.coding import (
+    router as coding_router,
+)
+
 
 api_router = APIRouter(
     prefix="/api/v1"
@@ -43,4 +47,8 @@ api_router.include_router(
 
 api_router.include_router(
     plans_router
+)
+
+api_router.include_router(
+    coding_router
 )

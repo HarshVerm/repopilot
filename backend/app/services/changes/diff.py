@@ -1,0 +1,89 @@
+import hashlib
+from dataclasses import dataclass
+from pathlib import Path
+
+from app.services.changes.git import (
+    get_changed_files,
+    get_file_at_head,
+    get_git_diff,
+    get_numstat,
+)
+
+
+@dataclass(frozen=True)
+class ChangedFileMetadata:
+    path: str
+    before_sha256: str
+    after_sha256: str
+    lines_added: int
+    lines_deleted: int
+
+
+@dataclass(frozen=True)
+class DiffSummary:
+    diff: str
+    files: list[ChangedFileMetadata]
+    lines_added: int
+    lines_deleted: int
+
+
+def sha256_bytes(
+    content: bytes,
+) -> str:
+    return hashlib.sha256(content).hexdigest()
+
+
+def summarize_diff(
+    repository_path: Path,
+) -> DiffSummary:
+    changed_files = get_changed_files(
+        repository_path
+    )
+    numstat = get_numstat(
+        repository_path
+    )
+    files: list[ChangedFileMetadata] = []
+
+    for path in changed_files:
+        before_content = get_file_at_head(
+            repository_path,
+            path,
+        )
+        after_content = (
+            repository_path / path
+        ).read_bytes()
+        added, deleted = numstat.get(
+            path,
+            (
+                0,
+                0,
+            ),
+        )
+        files.append(
+            ChangedFileMetadata(
+                path=path,
+                before_sha256=sha256_bytes(
+                    before_content
+                ),
+                after_sha256=sha256_bytes(
+                    after_content
+                ),
+                lines_added=added,
+                lines_deleted=deleted,
+            )
+        )
+
+    return DiffSummary(
+        diff=get_git_diff(
+            repository_path
+        ),
+        files=files,
+        lines_added=sum(
+            file.lines_added
+            for file in files
+        ),
+        lines_deleted=sum(
+            file.lines_deleted
+            for file in files
+        ),
+    )
