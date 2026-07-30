@@ -35,10 +35,16 @@ export function cancelTask(taskId: string) {
   });
 }
 
-/** Purpose: Handle restart task for this frontend module. */
-export function restartTask(taskId: string) {
+/** Purpose: Restart a task, optionally supplying missing planner context. */
+export function restartTask(
+  taskId: string,
+  options?: { clarification?: string },
+) {
   return apiRequest<TaskResponse>(`/api/v1/tasks/${taskId}/restart`, {
     method: "POST",
+    body: options?.clarification
+      ? { clarification: options.clarification }
+      : undefined,
   });
 }
 

@@ -16,6 +16,12 @@ export const queryKeys = {
   /** Build the cache key for a filtered issue page. */
   connectedIssues: (repositoryId: string, search: string, page: number) =>
     ["github", "repository", repositoryId, "issues", search, page] as const,
+  /** Build the cache key for one connected repository issue. */
+  connectedIssue: (repositoryId: string, issueNumber: number) =>
+    ["github", "repository", repositoryId, "issue", issueNumber] as const,
+  /** Build the cache key for selectable files in one connected repository. */
+  connectedRepositoryFiles: (repositoryId: string) =>
+    ["github", "repository", repositoryId, "files"] as const,
   /** Build the cache key for one task. */
   task: (taskId: string) => ["task", taskId] as const,
   /** Build the cache key for a task timeline. */

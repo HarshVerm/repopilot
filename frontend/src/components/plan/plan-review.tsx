@@ -10,11 +10,15 @@ import {
   FileText,
   FolderOpen,
   ListOrdered,
+  MessageSquareText,
   SearchCode,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { approvePlan, getPlan, rejectPlan } from "@/lib/api/plans";
 import { isApiError } from "@/lib/api/client";
+import { restartTask } from "@/lib/api/tasks";
+import { canApprovePlan, planNeedsClarification } from "@/lib/plan-state";
 import { queryKeys } from "@/lib/query-client";
 import type { TaskResponse } from "@/types/api";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
@@ -25,9 +29,11 @@ import { StatusBadge } from "@/components/shared/status-badge";
 
 /** Purpose: Render the plan review interface. */
 export function PlanReview({ task }: { task: TaskResponse }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmReject, setConfirmReject] = useState(false);
   const [reason, setReason] = useState("");
+  const [clarification, setClarification] = useState("");
   const [conflict, setConflict] = useState<string | null>(null);
 
   const planQuery = useQuery({
@@ -74,6 +80,33 @@ export function PlanReview({ task }: { task: TaskResponse }) {
     },
   });
 
+  const clarificationMutation = useMutation({
+    mutationFn: () =>
+      restartTask(task.task_id, {
+        clarification: clarification.trim(),
+      }),
+    onSuccess: async (restartedTask) => {
+      queryClient.setQueryData(
+        queryKeys.task(restartedTask.task_id),
+        restartedTask,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.task(task.task_id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.taskTimeline(task.task_id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.tasks,
+        }),
+      ]);
+      router.push(
+        `/tasks/${restartedTask.task_id}?tab=plan`,
+      );
+    },
+  });
+
   if (!task.active_plan_id) {
     if (task.status === "plan_revision_required") {
       return (
@@ -109,8 +142,12 @@ export function PlanReview({ task }: { task: TaskResponse }) {
     return <EmptyState title="No plan yet" />;
   }
 
-  const canApprove = plan.status === "pending_approval";
-  const mutationPending = approveMutation.isPending || rejectMutation.isPending;
+  const needsClarification = planNeedsClarification(plan);
+  const canApprove = canApprovePlan(task.status, plan);
+  const mutationPending =
+    approveMutation.isPending ||
+    rejectMutation.isPending ||
+    clarificationMutation.isPending;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -139,6 +176,101 @@ export function PlanReview({ task }: { task: TaskResponse }) {
           <h2 className="font-semibold text-amber-300">Plan state changed</h2>
           <p className="mt-1 text-xs leading-relaxed">{conflict}</p>
         </div>
+      ) : null}
+
+      {needsClarification ? (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+          <div className="flex items-start gap-3">
+            <MessageSquareText className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-amber-200">
+                More context required
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-amber-100/80">
+                The planner cannot safely implement this issue yet. Answer the
+                questions below, then RepoPilot will create a new planning
+                attempt. This task remains available as history.
+              </p>
+
+              <ol className="mt-4 space-y-2 text-xs text-amber-50">
+                {plan.plan.missing_context.length > 0 ? (
+                  plan.plan.missing_context.map((question, index) => (
+                    <li
+                      key={question}
+                      className="flex gap-2 rounded-lg border border-amber-500/20 bg-black/20 p-3"
+                    >
+                      <span className="font-code text-amber-300">
+                        {index + 1}.
+                      </span>
+                      <span>{question}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li>
+                    Explain the intended behavior and any implementation
+                    constraints the planner should follow.
+                  </li>
+                )}
+              </ol>
+
+              <form
+                className="mt-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (
+                    clarification.trim() &&
+                    !clarificationMutation.isPending
+                  ) {
+                    clarificationMutation.mutate();
+                  }
+                }}
+              >
+                <label
+                  htmlFor="planner-clarification"
+                  className="text-xs font-semibold text-amber-100"
+                >
+                  Your clarification
+                </label>
+                <textarea
+                  id="planner-clarification"
+                  value={clarification}
+                  onChange={(event) =>
+                    setClarification(event.target.value)
+                  }
+                  maxLength={10_000}
+                  rows={5}
+                  placeholder="Answer each question with the expected behavior, source of truth, and any constraints."
+                  className="mt-2 w-full resize-y rounded-lg border border-amber-500/30 bg-[#060f16] px-3 py-2 text-sm leading-relaxed text-[#dae3ee] outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-300"
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <span className="font-code text-[10px] text-amber-100/60">
+                    {clarification.length}/10000
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={
+                      !clarification.trim() ||
+                      clarificationMutation.isPending
+                    }
+                    className="rounded bg-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-950 transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {clarificationMutation.isPending
+                      ? "Starting New Plan..."
+                      : "Submit Context & Replan"}
+                  </button>
+                </div>
+              </form>
+
+              {clarificationMutation.isError ? (
+                <div className="mt-4">
+                  <ErrorState
+                    error={clarificationMutation.error}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 overflow-hidden rounded border border-[#30363D] bg-[#30363D] md:grid-cols-3">

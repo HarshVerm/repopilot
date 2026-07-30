@@ -188,6 +188,29 @@ class GitHubAppClient:
             response.raise_for_status()
             return response
 
+    # Purpose: Call GitHub as the signed-in user for user-attributed actions.
+    async def user_request(
+        self,
+        *,
+        access_token: str,
+        method: str,
+        path: str,
+        json: dict | None = None,
+    ) -> httpx.Response:
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=settings.github_timeout_seconds,
+            follow_redirects=True,
+        ) as client:
+            response = await client.request(
+                method,
+                path,
+                headers=self.headers(access_token),
+                json=json,
+            )
+            response.raise_for_status()
+            return response
+
     # Purpose: List installation repositories for the GitHub integration workflow.
     async def list_installation_repositories(
         self,
@@ -261,6 +284,46 @@ class GitHubAppClient:
                 f"{repository_path(owner, repo)}/issues/"
                 f"{issue_number}"
             ),
+        )
+        return response.json()
+
+    # Purpose: List repository files from the selected branch recursively.
+    async def list_repository_tree(
+        self,
+        github_installation_id: int,
+        owner: str,
+        repo: str,
+        tree_sha: str,
+    ) -> dict:
+        response = await self.installation_request(
+            github_installation_id=github_installation_id,
+            method="GET",
+            path=(
+                f"{repository_path(owner, repo)}/git/trees/"
+                f"{quote(tree_sha, safe='')}"
+            ),
+            params={"recursive": 1},
+        )
+        return response.json()
+
+    # Purpose: Create an issue attributed to the signed-in GitHub user.
+    async def create_issue_as_user(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        repo: str,
+        title: str,
+        body: str,
+    ) -> dict:
+        response = await self.user_request(
+            access_token=access_token,
+            method="POST",
+            path=f"{repository_path(owner, repo)}/issues",
+            json={
+                "title": title,
+                "body": body,
+            },
         )
         return response.json()
 

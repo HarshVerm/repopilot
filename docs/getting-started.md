@@ -152,7 +152,8 @@ Open `http://localhost:3000`.
 3. Install the GitHub App on all repositories or selected repositories.
 4. Return to RepoPilot.
 5. Select a repository.
-6. Select an open issue.
+6. Select an open issue, or create one with a title, description, and
+   optional related files.
 7. Review RepoPilot's understanding and add optional instructions.
 8. Create the task.
 9. Wait for planning, coding, verification, and final review.

@@ -10,6 +10,7 @@ import {
   Github,
   Loader2,
   Lock,
+  Plus,
   Search,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/api/github";
 import { createTask } from "@/lib/api/tasks";
 import { queryKeys } from "@/lib/query-client";
+import { CreateIssueForm } from "@/components/github/create-issue-form";
 import { ErrorState } from "@/components/shared/error-state";
 
 /** Purpose: Provide the debounced value React behavior. */
@@ -52,6 +54,7 @@ export function CreateTaskModal({
   const [issuePage, setIssuePage] = useState(1);
   const [repositoryId, setRepositoryId] = useState<string | null>(null);
   const [issueNumber, setIssueNumber] = useState<number | null>(null);
+  const [creatingIssue, setCreatingIssue] = useState(false);
   const [instructions, setInstructions] = useState("");
   const debouncedRepositorySearch = useDebouncedValue(repositorySearch, 300);
   const debouncedIssueSearch = useDebouncedValue(issueSearch, 300);
@@ -89,13 +92,13 @@ export function CreateTaskModal({
         { search: debouncedIssueSearch, page: issuePage, perPage: 30 },
         signal,
       ),
-    enabled: open && step >= 2 && Boolean(repositoryId),
+    enabled: open && step >= 2 && !creatingIssue && Boolean(repositoryId),
     retry: false,
   });
   const issueQuery = useQuery({
     queryKey:
       repositoryId && issueNumber
-        ? ["github", "repository", repositoryId, "issue", issueNumber]
+        ? queryKeys.connectedIssue(repositoryId, issueNumber)
         : ["github", "repository", "none", "issue"],
     queryFn: ({ signal }) =>
       getConnectedRepositoryIssue(repositoryId!, issueNumber!, signal),
@@ -206,13 +209,15 @@ export function CreateTaskModal({
               <div className="border-b border-[#30363D] p-5">
                 <h1 className="text-base font-semibold text-white">
                   {step === 1 && "Select a repository"}
-                  {step === 2 && "Select an open issue"}
+                  {step === 2 && (creatingIssue ? "Create a GitHub issue" : "Select an open issue")}
                   {step === 3 && "Review RepoPilot's understanding"}
                   {step === 4 && "Add optional instructions"}
                 </h1>
                 <p className="mt-1 text-xs text-zinc-400">
                   {step === 1 && "Only repositories authorized through your GitHub App installations are shown."}
-                  {step === 2 && "Pull requests are excluded from this list."}
+                  {step === 2 && (creatingIssue
+                    ? "The issue will be created as your signed-in GitHub user. Related files are optional."
+                    : "Choose an existing issue or create a new one. Pull requests are excluded.")}
                   {step === 3 && "The raw GitHub issue remains the source snapshot for the task."}
                   {step === 4 && "Instructions cannot override repository scope or security policy."}
                 </p>
@@ -236,7 +241,13 @@ export function CreateTaskModal({
                       <button
                         type="button"
                         key={repository.id}
-                        onClick={() => setRepositoryId(repository.id)}
+                        onClick={() => {
+                          setRepositoryId(repository.id);
+                          setIssueNumber(null);
+                          setIssueSearch("");
+                          setIssuePage(1);
+                          setCreatingIssue(false);
+                        }}
                         className={`flex w-full items-center justify-between border-b border-[#21262D] px-3 py-3 text-left last:border-0 ${
                           repositoryId === repository.id ? "bg-blue-500/10" : "hover:bg-[#21262D]"
                         }`}
@@ -262,44 +273,78 @@ export function CreateTaskModal({
                   </Selector>
                 ) : null}
 
-                {step === 2 ? (
-                  <Selector
-                    search={issueSearch}
-                    onSearch={(value) => {
-                      setIssueSearch(value);
-                      setIssuePage(1);
+                {step === 2 && creatingIssue && repositoryId ? (
+                  <CreateIssueForm
+                    repositoryId={repositoryId}
+                    repositoryName={selectedRepository?.full_name ?? "selected repository"}
+                    onCancel={() => setCreatingIssue(false)}
+                    onCreated={(issue) => {
+                      setIssueNumber(issue.number);
+                      setCreatingIssue(false);
+                      setStep(3);
                     }}
-                    placeholder="Search issues..."
-                  >
-                    {issuesQuery.isFetching ? <LoadingRows /> : null}
-                    {issuesQuery.isError ? (
-                      <ErrorState error={issuesQuery.error} onRetry={() => issuesQuery.refetch()} />
-                    ) : null}
-                    {issuesQuery.data?.issues.map((issue) => (
+                  />
+                ) : null}
+
+                {step === 2 && !creatingIssue ? (
+                  <div>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#30363D] bg-[#0D1117] px-3 py-2.5">
+                      <p className="text-xs text-zinc-400">
+                        Don&apos;t see the issue you need?
+                      </p>
                       <button
                         type="button"
-                        key={issue.id}
-                        onClick={() => setIssueNumber(issue.number)}
-                        className={`w-full border-b border-[#21262D] px-3 py-3 text-left last:border-0 ${
-                          issueNumber === issue.number ? "bg-blue-500/10" : "hover:bg-[#21262D]"
-                        }`}
+                        onClick={() => setCreatingIssue(true)}
+                        disabled={selectedRepository?.permissions.issues === false}
+                        className="flex items-center gap-2 rounded-md border border-blue-500/50 px-3 py-1.5 text-xs font-semibold text-blue-300 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-600"
                       >
-                        <span className="font-code text-xs text-zinc-500">#{issue.number}</span>
-                        <span className="ml-2 text-sm text-zinc-100">{issue.title}</span>
-                        <span className="mt-1 block truncate text-xs text-zinc-500">
-                          {issue.labels.join(" · ") || `${issue.comments} comments`}
-                        </span>
+                        <Plus className="h-3.5 w-3.5" />
+                        Create new issue
                       </button>
-                    ))}
-                    {issuesQuery.isSuccess && issuesQuery.data.issues.length === 0 ? (
-                      <p className="p-6 text-center text-sm text-zinc-500">No open issues match this search.</p>
+                    </div>
+                    {selectedRepository?.permissions.issues === false ? (
+                      <p className="mb-3 text-xs text-amber-300">
+                        Enable GitHub App permission “Issues: read and write,” then approve the permission update before creating issues here.
+                      </p>
                     ) : null}
-                    <Pagination
-                      page={issuePage}
-                      hasNext={issuesQuery.data?.has_next ?? false}
-                      onPage={setIssuePage}
-                    />
-                  </Selector>
+                    <Selector
+                      search={issueSearch}
+                      onSearch={(value) => {
+                        setIssueSearch(value);
+                        setIssuePage(1);
+                      }}
+                      placeholder="Search issues..."
+                    >
+                      {issuesQuery.isFetching ? <LoadingRows /> : null}
+                      {issuesQuery.isError ? (
+                        <ErrorState error={issuesQuery.error} onRetry={() => issuesQuery.refetch()} />
+                      ) : null}
+                      {issuesQuery.data?.issues.map((issue) => (
+                        <button
+                          type="button"
+                          key={issue.id}
+                          onClick={() => setIssueNumber(issue.number)}
+                          className={`w-full border-b border-[#21262D] px-3 py-3 text-left last:border-0 ${
+                            issueNumber === issue.number ? "bg-blue-500/10" : "hover:bg-[#21262D]"
+                          }`}
+                        >
+                          <span className="font-code text-xs text-zinc-500">#{issue.number}</span>
+                          <span className="ml-2 text-sm text-zinc-100">{issue.title}</span>
+                          <span className="mt-1 block truncate text-xs text-zinc-500">
+                            {issue.labels.join(" · ") || `${issue.comments} comments`}
+                          </span>
+                        </button>
+                      ))}
+                      {issuesQuery.isSuccess && issuesQuery.data.issues.length === 0 ? (
+                        <p className="p-6 text-center text-sm text-zinc-500">No open issues match this search.</p>
+                      ) : null}
+                      <Pagination
+                        page={issuePage}
+                        hasNext={issuesQuery.data?.has_next ?? false}
+                        onPage={setIssuePage}
+                      />
+                    </Selector>
+                  </div>
                 ) : null}
 
                 {step === 3 ? (
@@ -369,6 +414,7 @@ export function CreateTaskModal({
                 {createMutation.isError ? <div className="mt-4"><ErrorState error={createMutation.error} /></div> : null}
               </div>
 
+              {!(step === 2 && creatingIssue) ? (
               <footer className="flex items-center justify-between border-t border-[#30363D] px-5 py-4">
                 <button
                   type="button"
@@ -400,6 +446,7 @@ export function CreateTaskModal({
                   </button>
                 )}
               </footer>
+              ) : null}
             </section>
           )}
         </div>

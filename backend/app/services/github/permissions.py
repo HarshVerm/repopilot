@@ -46,9 +46,11 @@ def repository_capabilities_from_app_permissions(
     pull_requests = normalized.get(
         "pull_requests"
     )
+    issues = normalized.get("issues")
 
     return {
         "pull": contents in {"read", "write"},
         "push": contents == "write",
         "pull_requests": pull_requests == "write",
+        "issues": issues == "write",
     }

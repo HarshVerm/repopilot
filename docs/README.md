@@ -8,6 +8,7 @@ before starting.
 
 | Guide | What you will learn |
 | --- | --- |
+| [Build from scratch](build-from-scratch.md) | Recreate the application manually in a safe implementation order |
 | [Getting started](getting-started.md) | Install dependencies, configure environment variables, and run the application |
 | [Architecture](architecture.md) | Understand the major components and how a request travels through the system |
 | [Complete workflow flowchart](workflow-flowchart.md) | View the entire task and service lifecycle in one diagram |
@@ -21,6 +22,7 @@ before starting.
 | [API guide](api-guide.md) | See every API group and its purpose |
 | [Testing and troubleshooting](testing-and-troubleshooting.md) | Run checks and diagnose common errors |
 | [Deployment](deployment.md) | Deploy the current architecture safely |
+| [Free-tier deployment](free-tier-deployment.md) | Run a small public demo on compatible free infrastructure |
 | [Glossary](glossary.md) | Look up unfamiliar words and abbreviations |
 
 ## Existing advanced references

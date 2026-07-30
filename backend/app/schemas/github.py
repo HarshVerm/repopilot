@@ -1,6 +1,24 @@
 # Module purpose: Define validated github API payload schemas.
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
+
+
+RepositoryFilePath = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=1000,
+    ),
+]
 
 
 # Purpose: Validate and represent repository response data.
@@ -85,3 +103,36 @@ class IssueListResponse(BaseModel):
     page: int
     per_page: int
     has_next: bool
+
+
+# Purpose: Validate and represent repository file list response data.
+class RepositoryFileListResponse(BaseModel):
+    files: list[str]
+    total: int
+    truncated: bool
+    default_branch: str
+
+
+# Purpose: Validate a request to create a GitHub issue.
+class CreateIssueRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    title: str = Field(min_length=1, max_length=300)
+    description: str = Field(min_length=1, max_length=30_000)
+    related_files: list[RepositoryFilePath] = Field(
+        default_factory=list,
+        max_length=20,
+    )
+
+    # Purpose: Keep optional related file selections unique and predictable.
+    @field_validator("related_files")
+    @classmethod
+    def validate_related_files(
+        cls,
+        value: list[str],
+    ) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError(
+                "Related files must not contain duplicates."
+            )
+        return value

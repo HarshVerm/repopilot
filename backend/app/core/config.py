@@ -113,6 +113,7 @@ class Settings(BaseSettings):
 
     rate_limit_window_seconds: int = 60
     rate_limit_task_create: int = 20
+    rate_limit_issue_create: int = 10
     rate_limit_planning: int = 10
     rate_limit_coding: int = 10
     rate_limit_sandbox: int = 12
@@ -197,6 +198,7 @@ class Settings(BaseSettings):
             "provider_max_retries",
             "rate_limit_window_seconds",
             "rate_limit_task_create",
+            "rate_limit_issue_create",
             "rate_limit_planning",
             "rate_limit_coding",
             "rate_limit_sandbox",

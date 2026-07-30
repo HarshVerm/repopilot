@@ -23,7 +23,23 @@ def test_publication_uses_github_app_permission_grants():
             "pull": True,
             "push": True,
             "pull_requests": True,
+            "issues": False,
         }
+    )
+
+
+def test_issue_creation_requires_issue_write_grant():
+    permissions = {
+        "contents": "write",
+        "issues": "write",
+        "pull_requests": "write",
+    }
+
+    assert (
+        repository_capabilities_from_app_permissions(
+            permissions
+        )["issues"]
+        is True
     )
 
 

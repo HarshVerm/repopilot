@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     model_validator,
 )
@@ -45,6 +46,17 @@ class CreateTaskRequest(BaseModel):
                 "Provide repository_id or legacy owner/repo, but not both"
             )
         return self
+
+
+# Purpose: Validate optional input supplied when restarting a stopped task.
+class RestartTaskRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    clarification: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=10_000,
+    )
 
 
 # Purpose: Validate and represent task response data.

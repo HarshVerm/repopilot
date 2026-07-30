@@ -5,6 +5,11 @@ serverless application. It needs PostgreSQL, persistent task workspaces,
 long-running backend work, outbound access to GitHub and OpenAI, and a secure
 Docker sandbox for repository commands.
 
+For a step-by-step $0-infrastructure demo, see
+[Free-Tier Deployment](free-tier-deployment.md). The free-tier guide also
+explains which popular free hosts are incompatible with the complete RepoPilot
+worker.
+
 ## Recommended first production shape
 
 ```mermaid
@@ -202,4 +207,3 @@ Keep PostgreSQL as the state authority throughout this path.
 - PostgreSQL backup and restore are tested.
 - Workspace disk and sandbox limits are configured.
 - A full pull-request publication smoke test passes.
-

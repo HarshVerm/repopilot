@@ -111,6 +111,21 @@ unless a controlled migration requires it.
 | POST | `/api/v1/tasks/{task_id}/review/reject` | Reject the final diff |
 | POST | `/api/v1/tasks/{task_id}/publish` | Publish the approved diff |
 
+The restart endpoint accepts an optional clarification body:
+
+```json
+{
+  "clarification": "Use the account birth date as the source of truth."
+}
+```
+
+Clarification is accepted only when the task is in
+`plan_revision_required`. If the active plan has `needs_more_context: true`, a
+restart without clarification returns `409 PLAN_CONTEXT_REQUIRED` and includes
+the planner's questions in `details.missing_context`. A successful clarified
+restart preserves the old attempt, marks its plan as superseded, appends the
+answer to the original task instructions, and creates a new task attempt.
+
 ## Lower-level workflow endpoints
 
 These endpoints expose individual pipeline stages. The task orchestrator
@@ -177,7 +192,7 @@ workflow.
 | 401 | No valid RepoPilot session |
 | 403 | Signed-in user lacks access or GitHub denied permission |
 | 404 | Resource does not exist or is not visible to this user |
-| 409 | Duplicate operation or stale-state conflict |
+| 409 | Duplicate operation, stale-state conflict, or required workflow context is missing |
 | 422 | Request body does not match the schema |
 | 503 | Required integration is not configured or dependency is unavailable |
 | 500 | Unexpected server error; inspect the backend traceback |
@@ -193,4 +208,3 @@ workflow.
 7. Add unit or integration tests.
 8. Add the frontend client and query/mutation only after the contract is clear.
 9. Update this guide if the endpoint is user-facing.
-

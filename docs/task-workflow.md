@@ -10,11 +10,17 @@ The new-task screen:
 
 1. refreshes repositories authorized through the GitHub App;
 2. lists issues for the selected repository;
-3. loads the selected issue's title and body;
-4. lets the user add instructions and choose an autonomy mode.
+3. optionally creates a GitHub issue as the signed-in user, with a required
+   description and optional related-file paths;
+4. loads the selected or newly created issue's title and body;
+5. lets the user add instructions and choose an autonomy mode.
 
 Selecting an issue does not download and inspect the whole repository. That
 starts only after the task is created.
+
+The optional file picker reads path names from the default branch. It does not
+index file contents or restrict the later RAG pipeline. Selected paths are
+written into the GitHub issue body as human-provided context.
 
 ## Standard workflow
 
@@ -39,6 +45,12 @@ In Standard mode, a valid plan is approved automatically. The final diff still
 requires explicit human approval before publication.
 
 Strict mode keeps the plan approval as a human gate as well.
+
+If the planner does not have enough evidence to propose a safe change, it sets
+`needs_more_context` and lists concrete questions. This is not an approvable
+plan. The Plan tab asks the user to answer those questions and then starts a new
+planning attempt with the clarification appended to the original instructions.
+The blocked attempt is retained as history and its plan is marked superseded.
 
 ## Stages
 
@@ -118,6 +130,11 @@ multiple concurrent workflow runs.
 
 Restart does not mean "ignore safety checks." Existing plan, workspace, review,
 and permission invariants still apply.
+
+For a task stopped on missing planner context, a plain restart is intentionally
+blocked with `PLAN_CONTEXT_REQUIRED`. Use the clarification form on the Plan
+tab. It sends the answer with the restart request, fetches the latest GitHub
+issue state, and creates a clean planning attempt.
 
 ## Failures and retryability
 

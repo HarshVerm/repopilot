@@ -39,7 +39,7 @@ Grant only these repository permissions:
 
 - **Metadata:** Read-only (GitHub grants this by default)
 - **Contents:** Read and write
-- **Issues:** Read-only
+- **Issues:** Read and write
 - **Pull requests:** Read and write
 
 No organization administration or repository administration permission is
@@ -50,6 +50,11 @@ current installation.
 Private repositories work through the same installation-token flow. An
 organization installation may remain unavailable until an organization owner
 approves it.
+
+If the app was already installed with Issues read-only access, changing this
+setting is not enough by itself. Open the installation on GitHub and approve
+the requested permission update. Then refresh the repository list in
+RepoPilot.
 
 ## 3. Generate credentials
 

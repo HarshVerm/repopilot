@@ -93,6 +93,7 @@ class InMemoryRateLimiter:
 
 RATE_LIMITS_BY_OPERATION = {
     "task_create": settings.rate_limit_task_create,
+    "issue_create": settings.rate_limit_issue_create,
     "planning": settings.rate_limit_planning,
     "coding": settings.rate_limit_coding,
     "sandbox": settings.rate_limit_sandbox,

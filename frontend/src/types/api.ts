@@ -206,6 +206,19 @@ export interface IssueListResponse {
   has_next: boolean;
 }
 
+export interface RepositoryFileListResponse {
+  files: string[];
+  total: number;
+  truncated: boolean;
+  default_branch: string;
+}
+
+export interface CreateIssueRequest {
+  title: string;
+  description: string;
+  related_files: string[];
+}
+
 export interface SourceReference {
   file_path: string;
   start_line: number | null;

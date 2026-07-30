@@ -3,8 +3,10 @@
 import type {
   ConnectedRepositoryListResponse,
   ConnectedRepositoryResponse,
+  CreateIssueRequest,
   IssueListResponse,
   IssueResponse,
+  RepositoryFileListResponse,
 } from "@/types/api";
 import { apiRequest } from "./client";
 
@@ -69,5 +71,30 @@ export function getConnectedRepositoryIssue(
   return apiRequest<IssueResponse>(
     `/api/v1/github/repositories/${repositoryId}/issues/${issueNumber}`,
     { signal },
+  );
+}
+
+/** Purpose: List selectable files from a connected repository default branch. */
+export function listConnectedRepositoryFiles(
+  repositoryId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<RepositoryFileListResponse>(
+    `/api/v1/github/repositories/${repositoryId}/files?limit=5000`,
+    { signal },
+  );
+}
+
+/** Purpose: Create an issue in a connected repository as the signed-in user. */
+export function createConnectedRepositoryIssue(
+  repositoryId: string,
+  payload: CreateIssueRequest,
+) {
+  return apiRequest<IssueResponse>(
+    `/api/v1/github/repositories/${repositoryId}/issues`,
+    {
+      method: "POST",
+      body: payload,
+    },
   );
 }

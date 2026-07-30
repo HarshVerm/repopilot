@@ -1,6 +1,7 @@
 # Module purpose: Define github HTTP API routes.
 
 import uuid
+from html import escape as escape_html
 from typing import Annotated
 
 import httpx
@@ -18,12 +19,23 @@ from app.core.config import settings
 from app.schemas.github import (
     ConnectedRepositoryListResponse,
     ConnectedRepositoryResponse,
+    CreateIssueRequest,
     GitHubInstallationListResponse,
     IssueListResponse,
     IssueResponse,
+    RepositoryFileListResponse,
     RepositoryResponse,
 )
 from app.schemas.mapper import map_issue, map_repository
+from app.observability.logging import (
+    log_task_event,
+    log_task_failure,
+)
+from app.services.auth.github_tokens import (
+    GitHubUserAuthorizationRequired,
+    GitHubUserAuthorizationUnavailable,
+    GitHubUserTokenService,
+)
 from app.services.auth.service import (
     auth_error,
     require_csrf,
@@ -37,6 +49,9 @@ from app.services.github.client import github_client
 from app.services.github.installations import (
     InstallationService,
     installation_http_error,
+)
+from app.services.hardening.rate_limit import (
+    enforce_rate_limit,
 )
 
 
@@ -240,6 +255,51 @@ async def get_connected_repository(
     return serialize_repository(repository)
 
 
+# Purpose: List selectable files from a connected repository default branch.
+@router.get(
+    "/repositories/{repository_id}/files",
+    response_model=RepositoryFileListResponse,
+)
+async def list_connected_repository_files(
+    repository_id: uuid.UUID,
+    search: Annotated[
+        str | None,
+        Query(max_length=200),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=5000),
+    ] = 5000,
+    user: User = Depends(require_current_user),
+    db: AsyncSession = Depends(get_db),
+    github: GitHubAppClient = Depends(get_github_app_client),
+):
+    repository, installation = await resolve_user_repository(
+        repository_id=repository_id,
+        user_id=user.id,
+        db=db,
+    )
+    files, github_truncated = await load_repository_file_paths(
+        repository=repository,
+        installation=installation,
+        github=github,
+    )
+    if search and search.strip():
+        needle = search.strip().casefold()
+        files = [
+            path
+            for path in files
+            if needle in path.casefold()
+        ]
+    total = len(files)
+    return {
+        "files": files[:limit],
+        "total": total,
+        "truncated": github_truncated or total > limit,
+        "default_branch": repository.default_branch,
+    }
+
+
 # Purpose: List connected repository issues for the GitHub integration workflow.
 @router.get(
     "/repositories/{repository_id}/issues",
@@ -305,6 +365,148 @@ async def list_connected_repository_issues(
     }
 
 
+# Purpose: Create a GitHub issue as the signed-in user.
+@router.post(
+    "/repositories/{repository_id}/issues",
+    response_model=IssueResponse,
+    status_code=201,
+    dependencies=[
+        Depends(enforce_rate_limit("issue_create")),
+    ],
+)
+async def create_connected_repository_issue(
+    repository_id: uuid.UUID,
+    payload: CreateIssueRequest,
+    user: User = Depends(require_csrf),
+    db: AsyncSession = Depends(get_db),
+    github: GitHubAppClient = Depends(get_github_app_client),
+):
+    repository, installation = await resolve_user_repository(
+        repository_id=repository_id,
+        user_id=user.id,
+        db=db,
+    )
+    permissions = repository.permissions_json or {}
+    if permissions.get("issues") is False:
+        raise auth_error(
+            status_code=403,
+            code="GITHUB_ISSUE_WRITE_PERMISSION_REQUIRED",
+            message=(
+                "RepoPilot needs GitHub App Issues: read and write "
+                "permission to create an issue."
+            ),
+            details={
+                "required_permission": "issues:write",
+            },
+        )
+
+    if payload.related_files:
+        available_files, _ = await load_repository_file_paths(
+            repository=repository,
+            installation=installation,
+            github=github,
+        )
+        missing_files = sorted(
+            set(payload.related_files)
+            - set(available_files)
+        )
+        if missing_files:
+            raise auth_error(
+                status_code=422,
+                code="RELATED_FILES_INVALID",
+                message=(
+                    "One or more related files are no longer present "
+                    "on the repository's default branch."
+                ),
+                details={
+                    "files": missing_files[:20],
+                },
+            )
+
+    body = build_issue_body(
+        description=payload.description,
+        related_files=payload.related_files,
+    )
+    if len(body) > settings.max_issue_body_chars:
+        raise auth_error(
+            status_code=422,
+            code="GITHUB_ISSUE_BODY_TOO_LONG",
+            message=(
+                "The issue description and related file list are "
+                f"limited to {settings.max_issue_body_chars} characters."
+            ),
+        )
+
+    try:
+        access_token = await GitHubUserTokenService().access_token(
+            user_id=user.id,
+            db=db,
+        )
+        issue = await github.create_issue_as_user(
+            access_token=access_token,
+            owner=repository.owner,
+            repo=repository.name,
+            title=payload.title,
+            body=body,
+        )
+    except GitHubUserAuthorizationRequired as exc:
+        raise auth_error(
+            status_code=409,
+            code="GITHUB_USER_AUTHORIZATION_REQUIRED",
+            message=(
+                "Reconnect your GitHub account before creating an "
+                f"issue as @{user.github_login}."
+            ),
+            details={
+                "setup_path": (
+                    "/api/v1/auth/github/"
+                    "user-authorization/setup"
+                ),
+            },
+        ) from exc
+    except GitHubUserAuthorizationUnavailable as exc:
+        raise auth_error(
+            status_code=502,
+            code="GITHUB_USER_AUTHORIZATION_UNAVAILABLE",
+            message=(
+                "GitHub user authorization could not be refreshed. "
+                "Try creating the issue again."
+            ),
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        log_task_failure(
+            "github.issue_creation_failed",
+            exc,
+            repository_id=str(repository.id),
+            repository=repository.full_name,
+            github_status=exc.response.status_code,
+        )
+        raise github_issue_creation_http_error(exc) from exc
+    except httpx.HTTPError as exc:
+        log_task_failure(
+            "github.issue_creation_failed",
+            exc,
+            repository_id=str(repository.id),
+            repository=repository.full_name,
+        )
+        raise auth_error(
+            status_code=502,
+            code="GITHUB_UNAVAILABLE",
+            message="GitHub could not create the issue. Try again.",
+        ) from exc
+
+    log_task_event(
+        "github.issue_created",
+        user_id=str(user.id),
+        repository_id=str(repository.id),
+        repository=repository.full_name,
+        issue_number=issue.get("number"),
+        related_file_count=len(payload.related_files),
+        issue_actor=user.github_login,
+    )
+    return map_issue(issue)
+
+
 # Purpose: Return connected repository issue for the GitHub integration workflow.
 @router.get(
     "/repositories/{repository_id}/issues/{issue_number}",
@@ -344,6 +546,156 @@ async def get_connected_repository_issue(
             message="GitHub issue not found.",
         )
     return map_issue(issue)
+
+
+# Purpose: Load and validate blob paths from a repository's default branch.
+async def load_repository_file_paths(
+    *,
+    repository: Repository,
+    installation: GitHubInstallation,
+    github: GitHubAppClient,
+) -> tuple[list[str], bool]:
+    try:
+        payload = await github.list_repository_tree(
+            installation.github_installation_id,
+            repository.owner,
+            repository.name,
+            repository.default_branch,
+        )
+    except httpx.HTTPStatusError as exc:
+        raise installation_http_error(exc) from exc
+    except httpx.HTTPError as exc:
+        raise auth_error(
+            status_code=502,
+            code="GITHUB_UNAVAILABLE",
+            message="GitHub could not load repository files. Try again.",
+        ) from exc
+    files = sorted(
+        {
+            path
+            for item in payload.get("tree", [])
+            if item.get("type") == "blob"
+            and isinstance(item.get("path"), str)
+            and (
+                path := validated_repository_file_path(
+                    item["path"]
+                )
+            )
+            is not None
+        }
+    )
+    return files, bool(payload.get("truncated"))
+
+
+# Purpose: Reject unsafe or unusable repository paths before displaying them.
+def validated_repository_file_path(
+    value: str,
+) -> str | None:
+    if (
+        not value
+        or len(value) > 1000
+        or value.startswith("/")
+        or any(character in value for character in "\0\r\n")
+    ):
+        return None
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return None
+    return value
+
+
+# Purpose: Build the GitHub issue body with optional related-file context.
+def build_issue_body(
+    *,
+    description: str,
+    related_files: list[str],
+) -> str:
+    body = description.strip()
+    if not related_files:
+        return body
+    file_list = "\n".join(
+        f"- <code>{escape_html(path)}</code>"
+        for path in related_files
+    )
+    return (
+        f"{body}\n\n---\n\n"
+        "### Related files\n\n"
+        f"{file_list}"
+    )
+
+
+# Purpose: Convert GitHub issue-creation failures into actionable API errors.
+def github_issue_creation_http_error(
+    exc: httpx.HTTPStatusError,
+) -> HTTPException:
+    status_code = exc.response.status_code
+    if (
+        status_code == 429
+        or exc.response.headers.get(
+            "x-ratelimit-remaining"
+        )
+        == "0"
+    ):
+        return auth_error(
+            status_code=429,
+            code="GITHUB_RATE_LIMITED",
+            message="GitHub rate-limited issue creation. Try again later.",
+        )
+    if status_code == 401:
+        return auth_error(
+            status_code=409,
+            code="GITHUB_USER_AUTHORIZATION_REQUIRED",
+            message=(
+                "Reconnect your GitHub account before creating an issue."
+            ),
+            details={
+                "setup_path": (
+                    "/api/v1/auth/github/"
+                    "user-authorization/setup"
+                ),
+            },
+        )
+    if status_code == 403:
+        return auth_error(
+            status_code=403,
+            code="GITHUB_ISSUE_WRITE_PERMISSION_REQUIRED",
+            message=(
+                "RepoPilot needs GitHub App Issues: read and write "
+                "permission to create an issue."
+            ),
+            details={
+                "required_permission": "issues:write",
+            },
+        )
+    if status_code == 404:
+        return auth_error(
+            status_code=404,
+            code="REPOSITORY_NOT_FOUND",
+            message=(
+                "GitHub could not find this repository for the "
+                "signed-in user."
+            ),
+        )
+    if status_code == 410:
+        return auth_error(
+            status_code=409,
+            code="GITHUB_ISSUES_DISABLED",
+            message="GitHub Issues are disabled for this repository.",
+        )
+    if status_code == 422:
+        return auth_error(
+            status_code=422,
+            code="GITHUB_ISSUE_INVALID",
+            message=(
+                "GitHub rejected the issue. Check the title and "
+                "description, then try again."
+            ),
+        )
+    return auth_error(
+        status_code=502,
+        code="GITHUB_UNAVAILABLE",
+        message="GitHub could not create the issue. Try again.",
+    )
 
 
 # Purpose: Resolve user repository for the GitHub integration workflow.

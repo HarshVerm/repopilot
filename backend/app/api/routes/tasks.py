@@ -15,13 +15,15 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.task_event import TaskEvent
+from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.identity import User
+from app.db.models.task_event import TaskEvent
 from app.db.session import get_db
 from app.schemas.tasks import (
     CancelTaskResponse,
     CreateTaskRequest,
     ReconcileTaskResponse,
+    RestartTaskRequest,
     TaskListResponse,
     TaskMetricsResponse,
     TaskResponse,
@@ -489,6 +491,7 @@ async def restart_task(
     task_id: UUID,
     request: Request,
     background_tasks: BackgroundTasks,
+    payload: RestartTaskRequest | None = None,
     db: AsyncSession = Depends(get_db),
     auth: AuthContext | None = Depends(
         get_optional_auth_context
@@ -519,6 +522,57 @@ async def restart_task(
                 "Only failed, cancelled, or plan-revision tasks can be restarted"
             ),
         )
+    clarification = (
+        payload.clarification.strip()
+        if payload is not None
+        and payload.clarification is not None
+        else None
+    )
+    active_plan = (
+        await db.get(
+            ExecutionPlan,
+            task.active_plan_id,
+        )
+        if task.active_plan_id is not None
+        else None
+    )
+    missing_context_required = bool(
+        active_plan is not None
+        and active_plan.status == "pending_approval"
+        and (active_plan.plan_json or {}).get(
+            "needs_more_context"
+        )
+    )
+    if missing_context_required and not clarification:
+        raise auth_error(
+            status_code=409,
+            code="PLAN_CONTEXT_REQUIRED",
+            message=(
+                "Answer the plan's missing-context questions before "
+                "restarting planning."
+            ),
+            details={
+                "missing_context": (
+                    active_plan.plan_json.get(
+                        "missing_context",
+                        [],
+                    )
+                ),
+            },
+        )
+    if clarification and prior_status != PLAN_REVISION_REQUIRED:
+        raise auth_error(
+            status_code=409,
+            code="PLAN_CLARIFICATION_NOT_ALLOWED",
+            message=(
+                "Planner clarification can only be added to a task "
+                "that requires plan revision."
+            ),
+        )
+    updated_instructions = merge_task_instructions(
+        existing=task.user_instructions,
+        clarification=clarification,
+    )
     if (
         auth is None
         or task.repository_id is None
@@ -571,6 +625,17 @@ async def restart_task(
 
     task_service = TaskService()
     if prior_status == PLAN_REVISION_REQUIRED:
+        if (
+            active_plan is not None
+            and active_plan.status == "pending_approval"
+        ):
+            active_plan.status = "superseded"
+            active_plan.rejection_reason = (
+                "Superseded by a new planning attempt after "
+                "the user supplied clarification."
+                if clarification
+                else "Superseded by a new planning attempt."
+            )
         task = await task_service.transition_task(
             task_id=task.id,
             new_status=CANCELLED,
@@ -578,7 +643,19 @@ async def restart_task(
             event_type="task.restart_superseded",
             metadata={
                 "prior_status": prior_status,
-                "reason": "new_planning_attempt",
+                "reason": (
+                    "planner_context_supplied"
+                    if clarification
+                    else "new_planning_attempt"
+                ),
+                "clarification_provided": bool(
+                    clarification
+                ),
+                "superseded_plan_id": (
+                    str(active_plan.id)
+                    if active_plan is not None
+                    else None
+                ),
             },
         )
     restarted = await task_service.create_task(
@@ -593,7 +670,7 @@ async def restart_task(
         issue_summary=derive_issue_summary(
             issue
         ),
-        user_instructions=task.user_instructions,
+        user_instructions=updated_instructions,
         base_branch=repository.default_branch,
         autonomy_mode=task.autonomy_mode,
     )
@@ -620,6 +697,9 @@ async def restart_task(
             "restarted_from_task_id": str(
                 task.id
             ),
+            "clarification_provided": bool(
+                clarification
+            ),
         },
         commit=True,
     )
@@ -631,6 +711,38 @@ async def restart_task(
     return serialize_task(
         restarted
     )
+
+
+# Purpose: Preserve original instructions and append planner clarification.
+def merge_task_instructions(
+    *,
+    existing: str | None,
+    clarification: str | None,
+) -> str | None:
+    if not clarification:
+        return existing
+    clarification_section = (
+        "Planner clarification:\n"
+        f"{clarification.strip()}"
+    )
+    combined = "\n\n".join(
+        part
+        for part in [
+            existing.strip() if existing else None,
+            clarification_section,
+        ]
+        if part
+    )
+    if len(combined) > 10_000:
+        raise auth_error(
+            status_code=422,
+            code="TASK_INSTRUCTIONS_TOO_LONG",
+            message=(
+                "Existing instructions and planner clarification "
+                "must be 10,000 characters or fewer."
+            ),
+        )
+    return combined
 
 
 # Purpose: Reconcile task for the task lifecycle workflow.

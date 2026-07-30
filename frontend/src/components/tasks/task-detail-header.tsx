@@ -42,6 +42,9 @@ export function TaskDetailHeader({
   const [confirmRestart, setConfirmRestart] = useState(false);
   const actions = getAvailableTaskActions(task, publication);
   const restartable = isRestartableStatus(task.status);
+  const needsPlannerContext =
+    task.status === "plan_revision_required" &&
+    task.last_error_type === "PlannerNeedsMoreContext";
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelTask(task.task_id),
@@ -142,6 +145,10 @@ export function TaskDetailHeader({
           <button
             type="button"
             onClick={() => {
+              if (needsPlannerContext) {
+                onTabChange("plan");
+                return;
+              }
               if (restartable) {
                 restartMutation.reset();
                 setConfirmRestart(true);
@@ -151,8 +158,20 @@ export function TaskDetailHeader({
             }}
             disabled={restartMutation.isPending}
             className="rounded-xl border border-[#3F3F46] bg-[#27272A] p-2 text-zinc-400 transition-colors hover:bg-[#3F3F46] hover:text-white"
-            title={restartable ? "Restart task" : "Refresh state"}
-            aria-label={restartable ? "Restart task" : "Refresh state"}
+            title={
+              needsPlannerContext
+                ? "Provide missing plan context"
+                : restartable
+                  ? "Restart task"
+                  : "Refresh state"
+            }
+            aria-label={
+              needsPlannerContext
+                ? "Provide missing plan context"
+                : restartable
+                  ? "Restart task"
+                  : "Refresh state"
+            }
           >
             <RefreshCw
               className={`h-4 w-4 ${

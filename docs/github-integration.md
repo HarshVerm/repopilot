@@ -105,12 +105,27 @@ Use the smallest permissions that support the workflow:
 | --- | --- |
 | Metadata | Read-only; GitHub makes this mandatory |
 | Contents | Read and write |
-| Issues | Read-only |
+| Issues | Read and write |
 | Pull requests | Read and write |
 
 After changing app permissions, an existing installation may need to accept the
 new permissions on GitHub. Updating the app definition alone does not always
 update an already installed copy.
+
+## Creating an issue inside RepoPilot
+
+After choosing a repository, the user can select an existing open issue or
+create a new one. The creation form requires a title and description. It also
+loads file paths from the repository's default branch so the user can select
+up to 20 related files. File selection is optional.
+
+RepoPilot verifies the selected file paths against GitHub again before it
+creates the issue. The paths are added to a **Related files** section in the
+GitHub issue body; they do not grant access to any additional repository.
+
+The issue is created with the encrypted GitHub user access token, so GitHub
+attributes it to the signed-in user. Repository file listing still uses the
+short-lived installation token.
 
 ## How new repositories appear
 
@@ -130,6 +145,7 @@ Several identities can be involved:
 | Operation | Identity |
 | --- | --- |
 | Push the RepoPilot branch | GitHub App installation |
+| Create a GitHub issue in RepoPilot | Signed-in GitHub user |
 | Create the pull request | Signed-in GitHub user |
 | Git commit metadata | Currently `RepoPilot <repopilot@example.com>` |
 | App-generated activity GitHub attributes to the app | The GitHub App bot name |
@@ -155,10 +171,10 @@ token for pull request creation.
 | `GITHUB_AUTH_NOT_CONFIGURED` | OAuth client settings are missing | Client ID, client secret, environment loading, backend restart |
 | `GITHUB_APP_NOT_CONFIGURED` | GitHub App settings are incomplete | App ID, slug, private key, client values |
 | `GITHUB_PERMISSION_DENIED` | Installation cannot perform the requested write | Contents and pull request permissions; installation approval |
+| `GITHUB_ISSUE_WRITE_PERMISSION_REQUIRED` | RepoPilot cannot create an issue | Set Issues to read and write and approve the installation update |
 | OAuth callback 500 | Callback exchange or persistence failed | Backend traceback, exact callback URL, secret values, database migration |
 | Repository missing | App is not installed for that repository or data is stale | GitHub installation selection, then refresh/sync |
 
 See [Testing and Troubleshooting](testing-and-troubleshooting.md) for a more
 detailed diagnostic checklist and
 [GitHub App Setup](github-app-setup.md) for the configuration screen.
-

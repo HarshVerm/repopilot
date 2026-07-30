@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 from app.core.config import settings
+from app.db.models.execution_plan import ExecutionPlan
 from app.db.models.identity import (
     GitHubInstallation,
     GitHubUserAuthorization,
@@ -400,6 +401,262 @@ def test_stopped_native_task_restart_creates_deduplicated_attempt(
         )
 
 
+def test_missing_context_restart_requires_and_preserves_clarification(
+    monkeypatch,
+):
+    clarification = (
+        "Use 2000-01-01 as the authoritative birth date and "
+        "write the calculated age to age.txt."
+    )
+
+    async def seed():
+        user, other_user = await seed_users()
+        token = secrets.token_urlsafe(32)
+        csrf = secrets.token_urlsafe(24)
+        async with AsyncSessionLocal() as db:
+            installation = installation_for(user)
+            db.add(installation)
+            await db.flush()
+            repository = repository_for(
+                installation,
+                "native/clarification",
+            )
+            db.add(repository)
+            await db.flush()
+            task = await TaskService().create_task(
+                owner=repository.owner,
+                repo=repository.name,
+                issue_number=8,
+                db=db,
+                user_id=user.id,
+                installation_id=installation.id,
+                repository_id=repository.id,
+                issue_snapshot=issue_payload(8),
+                issue_summary="Update the current age",
+                user_instructions="Preserve the text format.",
+                base_branch=repository.default_branch,
+                autonomy_mode="standard",
+            )
+            plan_json = {
+                "summary": "Update the age",
+                "problem_analysis": (
+                    "The age source is not specified."
+                ),
+                "likely_root_cause": None,
+                "confidence": 0.25,
+                "files_to_inspect": [],
+                "files_to_modify": [],
+                "implementation_steps": [],
+                "tests": [],
+                "risks": [],
+                "assumptions": [],
+                "needs_more_context": True,
+                "missing_context": [
+                    "What is the authoritative birth date?"
+                ],
+            }
+            plan = ExecutionPlan(
+                workspace_id=str(task.id),
+                task_id=task.id,
+                repository_owner=repository.owner,
+                repository_name=repository.name,
+                issue_number=task.issue_number,
+                status="pending_approval",
+                summary=plan_json["summary"],
+                problem_analysis=plan_json[
+                    "problem_analysis"
+                ],
+                likely_root_cause=None,
+                confidence=plan_json["confidence"],
+                plan_json=plan_json,
+            )
+            db.add(plan)
+            await db.flush()
+            task.status = "plan_revision_required"
+            task.current_step = 5
+            task.failure_category = (
+                "plan_revision_required"
+            )
+            task.last_error_type = (
+                "PlannerNeedsMoreContext"
+            )
+            task.last_error = (
+                "The planner needs user clarification."
+            )
+            task.active_plan_id = plan.id
+            db.add(
+                UserSession(
+                    user_id=user.id,
+                    token_hash=secret_hash(token),
+                    csrf_token_hash=secret_hash(csrf),
+                    expires_at=datetime.now(UTC)
+                    + timedelta(hours=1),
+                )
+            )
+            await db.commit()
+            await db.refresh(task)
+            await db.refresh(plan)
+        return (
+            user,
+            other_user,
+            installation,
+            repository,
+            task,
+            plan,
+            token,
+            csrf,
+        )
+
+    class FakeGitHubApp:
+        async def get_issue(
+            self,
+            installation_id,
+            owner,
+            repo,
+            issue_number,
+        ):
+            assert (
+                installation_id,
+                owner,
+                repo,
+                issue_number,
+            ) == (
+                installation.github_installation_id,
+                "native",
+                "clarification",
+                8,
+            )
+            return {
+                **issue_payload(8),
+                "body": "Latest issue body",
+            }
+
+    async def no_op_background(_task_id):
+        return None
+
+    records = asyncio.run(seed())
+    (
+        user,
+        other_user,
+        installation,
+        repository,
+        task,
+        plan,
+        token,
+        csrf,
+    ) = records
+    task_ids = [task.id]
+    app.dependency_overrides[
+        get_github_app_client
+    ] = lambda: FakeGitHubApp()
+    monkeypatch.setattr(
+        task_routes,
+        "run_task_background",
+        no_op_background,
+    )
+    try:
+        with TestClient(app) as client:
+            client.cookies.set(
+                settings.session_cookie_name,
+                token,
+            )
+            client.cookies.set(
+                settings.csrf_cookie_name,
+                csrf,
+            )
+            blocked = client.post(
+                f"/api/v1/tasks/{task.id}/restart",
+                headers={
+                    settings.csrf_header_name: csrf,
+                },
+            )
+            restarted = client.post(
+                f"/api/v1/tasks/{task.id}/restart",
+                json={"clarification": clarification},
+                headers={
+                    settings.csrf_header_name: csrf,
+                },
+            )
+
+        assert blocked.status_code == 409
+        assert (
+            blocked.json()["detail"]["error"]["code"]
+            == "PLAN_CONTEXT_REQUIRED"
+        )
+        assert blocked.json()["detail"]["error"][
+            "details"
+        ]["missing_context"] == [
+            "What is the authoritative birth date?"
+        ]
+        assert restarted.status_code == 200, restarted.text
+        restarted_id = uuid.UUID(
+            restarted.json()["task_id"]
+        )
+        task_ids.append(restarted_id)
+        assert restarted.json()["user_instructions"] == (
+            "Preserve the text format.\n\n"
+            "Planner clarification:\n"
+            f"{clarification}"
+        )
+        assert (
+            restarted.json()["issue"]["body"]
+            == "Latest issue body"
+        )
+
+        async def assert_superseded_records():
+            async with AsyncSessionLocal() as db:
+                old_task = await db.get(
+                    RepoPilotTask,
+                    task.id,
+                )
+                old_plan = await db.get(
+                    ExecutionPlan,
+                    plan.id,
+                )
+                assert old_task is not None
+                assert old_task.status == "cancelled"
+                assert old_plan is not None
+                assert old_plan.status == "superseded"
+                assert (
+                    old_plan.rejection_reason
+                    and "clarification"
+                    in old_plan.rejection_reason
+                )
+
+        asyncio.run(assert_superseded_records())
+    finally:
+        app.dependency_overrides.pop(
+            get_github_app_client,
+            None,
+        )
+        asyncio.run(
+            cleanup_tenant_records(
+                user_ids=[
+                    user.id,
+                    other_user.id,
+                ],
+                task_ids=task_ids,
+                repository_ids=[
+                    repository.id,
+                ],
+                installation_ids=[
+                    installation.id,
+                ],
+            )
+        )
+
+        async def cleanup_plan():
+            async with AsyncSessionLocal() as db:
+                await db.execute(
+                    delete(ExecutionPlan).where(
+                        ExecutionPlan.id == plan.id
+                    )
+                )
+                await db.commit()
+
+        asyncio.run(cleanup_plan())
+
+
 def test_repository_list_refreshes_newly_granted_repositories():
     async def seed():
         user, other_user = await seed_users()
@@ -432,10 +689,11 @@ def test_repository_list_refreshes_newly_granted_repositories():
                 == installation.github_installation_id
             )
             return {
-                "permissions": {
-                    "contents": "write",
-                    "pull_requests": "write",
-                }
+                    "permissions": {
+                        "contents": "write",
+                        "issues": "write",
+                        "pull_requests": "write",
+                    }
             }
 
         async def list_installation_repositories(
@@ -508,10 +766,11 @@ def test_repository_list_refreshes_newly_granted_repositories():
         assert refreshed.json()["repositories"][0][
             "permissions"
         ] == {
-            "pull": True,
-            "push": True,
-            "pull_requests": True,
-        }
+                "pull": True,
+                "push": True,
+                "pull_requests": True,
+                "issues": True,
+            }
         assert github.calls == [
             (
                 installation.github_installation_id,
