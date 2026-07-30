@@ -1,3 +1,5 @@
+# Module purpose: Define debugging HTTP API routes.
+
 from uuid import UUID
 
 from fastapi import (
@@ -39,10 +41,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return debug orchestrator for the debugging workflow.
 def get_debug_orchestrator() -> DebugOrchestrator:
     return DebugOrchestrator()
 
 
+# Purpose: Handle debug execution run for the debugging workflow.
 @router.post(
     "/execution-runs/{execution_run_id}/debug",
     response_model=DebugRunResponse,
@@ -124,6 +128,7 @@ async def debug_execution_run(
     )
 
 
+# Purpose: Return debug attempt for the debugging workflow.
 @router.get(
     "/debug-attempts/{debug_attempt_id}",
     response_model=DebugAttemptResponse,

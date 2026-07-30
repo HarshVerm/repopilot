@@ -2,6 +2,7 @@ import asyncio
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -11,6 +12,7 @@ from sqlalchemy import delete, select
 from app.core.config import settings
 from app.db.models.identity import (
     GitHubInstallation,
+    GitHubUserAuthorization,
     OAuthState,
     Repository,
     User,
@@ -21,6 +23,7 @@ from app.db.models.task_event import TaskEvent
 from app.db.session import AsyncSessionLocal, engine
 from app.main import app
 from app.api.routes import github as github_routes
+from app.api.routes import publishing as publishing_routes
 from app.api.routes import tasks as task_routes
 from app.api.routes.tasks import get_github_app_client
 from app.services.auth.authorization import authorize_task
@@ -28,6 +31,10 @@ from app.services.auth.service import (
     AuthService,
     get_optional_auth_context,
     secret_hash,
+)
+from app.services.auth.github_tokens import (
+    GitHubOAuthTokenSet,
+    GitHubUserTokenService,
 )
 from app.services.github.app_client import (
     GitHubAppClient,
@@ -570,6 +577,111 @@ def test_missing_github_private_key_is_actionable(
         )
 
 
+def test_native_publication_uses_signed_in_user_token(
+    monkeypatch,
+):
+    class FakeGitHubApp:
+        async def get_installation(
+            self,
+            github_installation_id,
+        ):
+            assert github_installation_id > 0
+            return {
+                "permissions": {
+                    "contents": "write",
+                    "pull_requests": "write",
+                }
+            }
+
+        async def get_repository(
+            self,
+            github_installation_id,
+            owner,
+            repo,
+        ):
+            assert github_installation_id > 0
+            return {
+                "owner": {"login": owner},
+                "name": repo,
+                "full_name": f"{owner}/{repo}",
+                "default_branch": "main",
+            }
+
+        async def get_branch_head_sha(
+            self,
+            github_installation_id,
+            owner,
+            repo,
+            branch,
+        ):
+            assert github_installation_id > 0
+            assert owner and repo
+            assert branch == "main"
+            return "a" * 40
+
+    monkeypatch.setattr(
+        publishing_routes,
+        "github_app_client",
+        FakeGitHubApp(),
+    )
+
+    async def run():
+        user, other_user = await seed_users()
+        try:
+            async with AsyncSessionLocal() as db:
+                installation = installation_for(user)
+                db.add(installation)
+                await db.flush()
+                repository = repository_for(
+                    installation,
+                    f"{user.github_login}/project",
+                )
+                db.add(repository)
+                await db.commit()
+                await GitHubUserTokenService().store(
+                    user_id=user.id,
+                    token_set=GitHubOAuthTokenSet(
+                        access_token="ghu_user-attribution"
+                    ),
+                    db=db,
+                )
+
+                context = (
+                    await publishing_routes.native_publication_context(
+                        task=SimpleNamespace(
+                            id=uuid.uuid4(),
+                            repository_id=repository.id,
+                        ),
+                        auth=SimpleNamespace(user=user),
+                        review=SimpleNamespace(
+                            base_commit_sha="a" * 40
+                        ),
+                        db=db,
+                    )
+                )
+
+                assert (
+                    context["pull_request_actor_login"]
+                    == user.github_login
+                )
+                assert (
+                    context[
+                        "pull_request_credentials"
+                    ].token
+                    == "ghu_user-attribution"
+                )
+                assert (
+                    context["github_installation_id"]
+                    == installation.github_installation_id
+                )
+        finally:
+            await cleanup_users(
+                [user.id, other_user.id]
+            )
+
+    asyncio.run(run())
+
+
 def test_login_without_github_config_redirects_to_actionable_error(
     monkeypatch,
 ):
@@ -663,7 +775,9 @@ def test_login_callback_establishes_session_and_logout_revokes_it(
 
     async def exchange_code(_service, code):
         assert code == "one-time-code"
-        return "ephemeral-user-token"
+        return GitHubOAuthTokenSet(
+            access_token="ephemeral-user-token"
+        )
 
     async def fetch_identity(_service, access_token):
         assert access_token == "ephemeral-user-token"
@@ -709,6 +823,25 @@ def test_login_callback_establishes_session_and_logout_revokes_it(
             assert me.status_code == 200
             assert me.json()["github_user_id"] == github_user_id
             user_id = uuid.UUID(me.json()["user_id"])
+            async def assert_authorization_stored():
+                async with AsyncSessionLocal() as db:
+                    authorization = await db.scalar(
+                        select(
+                            GitHubUserAuthorization
+                        ).where(
+                            GitHubUserAuthorization.user_id
+                            == user_id
+                        )
+                    )
+                    assert authorization is not None
+                    assert (
+                        authorization.access_token_ciphertext
+                        != "ephemeral-user-token"
+                    )
+
+            asyncio.run(
+                assert_authorization_stored()
+            )
 
             csrf = client.cookies.get(
                 settings.csrf_cookie_name
@@ -727,6 +860,101 @@ def test_login_callback_establishes_session_and_logout_revokes_it(
     finally:
         if user_id is not None:
             asyncio.run(cleanup_users([user_id]))
+
+
+def test_user_authorization_callback_enables_user_attribution(
+    monkeypatch,
+):
+    async def seed():
+        user, other_user = await seed_users()
+        raw_token = secrets.token_urlsafe(32)
+        async with AsyncSessionLocal() as db:
+            state = await AuthService().create_oauth_state(
+                db=db,
+                purpose="user_authorization",
+                user_id=user.id,
+                redirect_path="/settings",
+            )
+            db.add(
+                UserSession(
+                    user_id=user.id,
+                    token_hash=secret_hash(raw_token),
+                    csrf_token_hash=secret_hash("csrf"),
+                    expires_at=datetime.now(UTC)
+                    + timedelta(hours=1),
+                )
+            )
+            await db.commit()
+        return user, other_user, raw_token, state
+
+    user, other_user, raw_token, state = asyncio.run(
+        seed()
+    )
+
+    async def exchange_code(_service, code):
+        assert code == "user-code"
+        return GitHubOAuthTokenSet(
+            access_token="ghu_attributed-user"
+        )
+
+    async def fetch_identity(_service, access_token):
+        assert access_token == "ghu_attributed-user"
+        return (
+            {
+                "id": user.github_user_id,
+                "login": user.github_login,
+            },
+            None,
+            [],
+        )
+
+    monkeypatch.setattr(
+        AuthService,
+        "exchange_code",
+        exchange_code,
+    )
+    monkeypatch.setattr(
+        AuthService,
+        "fetch_github_identity",
+        fetch_identity,
+    )
+    try:
+        with TestClient(app) as client:
+            client.cookies.set(
+                settings.session_cookie_name,
+                raw_token,
+            )
+            response = client.get(
+                "/api/v1/auth/github/callback",
+                params={
+                    "code": "user-code",
+                    "state": state,
+                },
+                follow_redirects=False,
+            )
+        assert response.status_code == 307
+        assert response.headers["location"].endswith(
+            "/settings?github=attribution-connected"
+        )
+
+        async def assert_stored():
+            async with AsyncSessionLocal() as db:
+                authorization = await db.scalar(
+                    select(
+                        GitHubUserAuthorization
+                    ).where(
+                        GitHubUserAuthorization.user_id
+                        == user.id
+                    )
+                )
+                assert authorization is not None
+                assert authorization.status == "active"
+
+        asyncio.run(assert_stored())
+    finally:
+        asyncio.run(
+            cleanup_users([user.id, other_user.id])
+        )
 
 
 def test_expired_session_is_rejected():
@@ -799,7 +1027,9 @@ def test_installation_verification_rejects_unowned_installation(
 
     async def exchange_code(_service, code):
         assert code == "temporary-code"
-        return "ephemeral-user-token"
+        return GitHubOAuthTokenSet(
+            access_token="ephemeral-user-token"
+        )
 
     async def fetch_identity(_service, access_token):
         assert access_token == "ephemeral-user-token"

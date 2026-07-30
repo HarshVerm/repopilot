@@ -1,3 +1,5 @@
+# Module purpose: Define indexing HTTP API routes.
+
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -63,6 +65,7 @@ MAX_SYMBOL_QUERY_LENGTH = 100
 MAX_SYMBOL_SEARCH_LIMIT = 50
 
 
+# Purpose: Escape like query for the repository indexing workflow.
 def escape_like_query(
     query: str,
 ) -> str:
@@ -74,6 +77,7 @@ def escape_like_query(
     )
 
 
+# Purpose: Create index for the repository indexing workflow.
 @router.post(
     "/{workspace_id}",
     response_model=IndexResponse,
@@ -183,6 +187,7 @@ async def create_index(
     }
 
 
+# Purpose: Handle search symbols for the repository indexing workflow.
 @router.get(
     "/{workspace_id}/symbols",
     response_model=list[SymbolSearchResult],

@@ -1,3 +1,5 @@
+"""Turn indexed repository files and symbols into embeddable code chunks."""
+
 import hashlib
 import uuid
 from dataclasses import dataclass
@@ -24,11 +26,13 @@ SYMBOL_CHUNK_KINDS = {
 
 
 class UnsafeRepositoryPathError(ValueError):
-    pass
+    """Raised when a stored path cannot be read safely from the workspace."""
 
 
 @dataclass(frozen=True)
 class ChunkDraft:
+    """Represent a code chunk before it is persisted with an embedding."""
+
     file_id: uuid.UUID
     symbol_id: uuid.UUID | None
     chunk_type: str
@@ -46,6 +50,7 @@ class ChunkDraft:
 def build_embedding_text(
     chunk: ChunkDraft,
 ) -> str:
+    """Combine searchable metadata and source content for embedding."""
     metadata = [
         f"File: {chunk.file_path}",
         f"Language: {chunk.language}",
@@ -72,6 +77,7 @@ def build_embedding_text(
 def calculate_chunk_hash(
     chunk: ChunkDraft,
 ) -> str:
+    """Hash the complete embedding input for integrity and deduplication."""
     return hashlib.sha256(
         build_embedding_text(chunk).encode(
             "utf-8"
@@ -83,6 +89,7 @@ def resolve_safe_repository_file(
     repository_path: Path,
     file_path: str,
 ) -> Path:
+    """Resolve a stored relative path without allowing workspace escape."""
     repository_root = repository_path.resolve()
     relative_path = Path(file_path)
 
@@ -132,6 +139,7 @@ def read_repository_source(
     repository_path: Path,
     file_path: str,
 ) -> str:
+    """Safely read a repository file as UTF-8-tolerant source text."""
     resolved_path = resolve_safe_repository_file(
         repository_path,
         file_path,
@@ -148,6 +156,7 @@ def slice_lines(
     start_line: int,
     end_line: int,
 ) -> str:
+    """Extract an inclusive, one-based line range from source text."""
     lines = source.splitlines(
         keepends=True
     )
@@ -184,6 +193,7 @@ def make_chunk_draft(
     chunk_index: int,
     content: str,
 ) -> ChunkDraft:
+    """Create a chunk draft and calculate its canonical content hash."""
     draft = ChunkDraft(
         file_id=file_record.id,
         symbol_id=(
@@ -228,6 +238,7 @@ def build_symbol_chunks(
     max_tokens: int,
     overlap_tokens: int,
 ) -> list[ChunkDraft]:
+    """Chunk a class, function, or method using its AST line boundaries."""
     if symbol.kind not in SYMBOL_CHUNK_KINDS:
         return []
 
@@ -268,6 +279,7 @@ def build_file_fallback_chunks(
     max_tokens: int,
     overlap_tokens: int,
 ) -> list[ChunkDraft]:
+    """Chunk a complete file so content outside named symbols is searchable."""
     splits = split_text_by_token_budget(
         source,
         max_tokens=max_tokens,
@@ -296,6 +308,7 @@ def build_code_chunks_for_file(
     max_tokens: int = settings.max_chunk_tokens,
     overlap_tokens: int = settings.chunk_overlap_tokens,
 ) -> list[ChunkDraft]:
+    """Build both symbol-level and full-file fallback chunks for a file."""
     source = read_repository_source(
         repository_path,
         file_record.file_path,

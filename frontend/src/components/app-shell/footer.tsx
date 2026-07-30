@@ -1,9 +1,12 @@
 "use client";
 
+// Module purpose: Render and coordinate the footer interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { getHealth } from "@/lib/api/health";
 import { queryKeys } from "@/lib/query-client";
 
+/** Purpose: Render the footer interface. */
 export function Footer() {
   const health = useQuery({
     queryKey: queryKeys.health,

@@ -1,6 +1,9 @@
+// Module purpose: Render and coordinate the error state interface.
+
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { errorMessage, errorTitle } from "@/lib/errors";
 
+/** Purpose: Render the error state interface. */
 export function ErrorState({
   error,
   onRetry,

@@ -1,3 +1,5 @@
+# Module purpose: Implement github behavior for the GitHub integration domain.
+
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -11,27 +13,34 @@ from app.services.publishing.git import (
 )
 
 
+# Purpose: Signal pull request creation failures.
 class PullRequestCreationError(RuntimeError):
     pass
 
 
+# Purpose: Signal git hub publisher failures.
 class GitHubPublisherError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate repository metadata behavior for the GitHub integration domain.
 @dataclass(frozen=True)
 class RepositoryMetadata:
     default_branch: str
 
 
+# Purpose: Encapsulate pull request metadata behavior for the GitHub integration domain.
 @dataclass(frozen=True)
 class PullRequestMetadata:
     number: int
     url: str
     head_sha: str | None = None
+    author_login: str | None = None
 
 
+# Purpose: Define the interface required from git hub publisher implementations.
 class GitHubPublisher(Protocol):
+    # Purpose: Return repository for the GitHub integration workflow.
     async def get_repository(
         self,
         *,
@@ -41,6 +50,7 @@ class GitHubPublisher(Protocol):
     ) -> RepositoryMetadata:
         ...
 
+    # Purpose: Find open pull request for the GitHub integration workflow.
     async def find_open_pull_request(
         self,
         *,
@@ -52,6 +62,7 @@ class GitHubPublisher(Protocol):
     ) -> PullRequestMetadata | None:
         ...
 
+    # Purpose: Create pull request for the GitHub integration workflow.
     async def create_pull_request(
         self,
         *,
@@ -66,9 +77,11 @@ class GitHubPublisher(Protocol):
         ...
 
 
+# Purpose: Encapsulate git hub api publisher behavior for the GitHub integration domain.
 class GitHubApiPublisher:
     base_url = "https://api.github.com"
 
+    # Purpose: Return repository for the GitHub integration workflow.
     async def get_repository(
         self,
         *,
@@ -86,6 +99,7 @@ class GitHubApiPublisher:
             default_branch=data["default_branch"]
         )
 
+    # Purpose: Find open pull request for the GitHub integration workflow.
     async def find_open_pull_request(
         self,
         *,
@@ -114,6 +128,7 @@ class GitHubApiPublisher:
             pull
         )
 
+    # Purpose: Create pull request for the GitHub integration workflow.
     async def create_pull_request(
         self,
         *,
@@ -146,6 +161,7 @@ class GitHubApiPublisher:
             data
         )
 
+    # Purpose: Request GitHub integration for the GitHub integration workflow.
     async def request(
         self,
         method: str,
@@ -194,6 +210,7 @@ class GitHubApiPublisher:
             return response.json()
 
 
+# Purpose: Handle pull request from json for the GitHub integration workflow.
 def pull_request_from_json(
     data: dict,
 ) -> PullRequestMetadata:
@@ -206,6 +223,12 @@ def pull_request_from_json(
                 data.get("head"),
                 dict,
             )
+            else None
+        ),
+        author_login=(
+            str(data["user"]["login"])
+            if isinstance(data.get("user"), dict)
+            and data["user"].get("login")
             else None
         ),
     )

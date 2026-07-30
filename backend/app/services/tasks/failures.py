@@ -1,3 +1,5 @@
+# Module purpose: Implement failures behavior for the task lifecycle domain.
+
 from app.db.models.execution_run import ExecutionRun
 from app.services.sandbox.results import (
     BUILD,
@@ -86,6 +88,7 @@ RETRYABLE_FAILURES = {
 }
 
 
+# Purpose: Normalize failure category for the task lifecycle workflow.
 def normalize_failure_category(
     category: str | None,
 ) -> str:
@@ -95,6 +98,7 @@ def normalize_failure_category(
     return UNKNOWN
 
 
+# Purpose: Handle retryable for category for the task lifecycle workflow.
 def retryable_for_category(
     category: str | None,
 ) -> bool:
@@ -103,6 +107,7 @@ def retryable_for_category(
     ) in RETRYABLE_FAILURES
 
 
+# Purpose: Classify execution failure for the task lifecycle workflow.
 def classify_execution_failure(
     run: ExecutionRun,
 ) -> str:

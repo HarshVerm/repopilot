@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the sidebar interface.
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -29,6 +31,7 @@ interface SidebarProps {
   isLoggingOut: boolean;
 }
 
+/** Purpose: Render the sidebar interface. */
 export function Sidebar({
   user,
   onOpenCreateTask,

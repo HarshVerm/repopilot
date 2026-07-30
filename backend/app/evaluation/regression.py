@@ -1,9 +1,12 @@
+# Module purpose: Implement regression behavior for the evaluation domain.
+
 from dataclasses import dataclass
 from typing import Any
 
 from app.core.config import settings
 
 
+# Purpose: Encapsulate regression thresholds behavior for the evaluation domain.
 @dataclass(frozen=True)
 class RegressionThresholds:
     success_drop_fail_pp: float = (
@@ -20,6 +23,7 @@ class RegressionThresholds:
     )
 
 
+# Purpose: Compare reports for the evaluation workflow.
 def compare_reports(
     *,
     baseline: dict[str, Any],
@@ -113,6 +117,7 @@ def compare_reports(
     }
 
 
+# Purpose: Handle percentage point delta for the evaluation workflow.
 def percentage_point_delta(
     candidate: float,
     baseline: float,
@@ -122,6 +127,7 @@ def percentage_point_delta(
     ) * 100
 
 
+# Purpose: Handle ratio delta for the evaluation workflow.
 def ratio_delta(
     candidate: float | int | None,
     baseline: float | int | None,

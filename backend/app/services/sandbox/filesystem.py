@@ -1,3 +1,5 @@
+# Module purpose: Implement filesystem behavior for the sandbox execution domain.
+
 import shutil
 import uuid
 from pathlib import Path
@@ -8,6 +10,7 @@ from app.services.indexing.scanner import (
 )
 
 
+# Purpose: Signal sandbox filesystem failures.
 class SandboxFilesystemError(RuntimeError):
     pass
 
@@ -28,6 +31,7 @@ IGNORED_SANDBOX_NAMES = {
 }
 
 
+# Purpose: Handle sandbox run directory for the sandbox execution workflow.
 def sandbox_run_directory(
     execution_run_id: uuid.UUID,
     *,
@@ -37,6 +41,7 @@ def sandbox_run_directory(
     return root / str(execution_run_id)
 
 
+# Purpose: Handle sandbox repository directory for the sandbox execution workflow.
 def sandbox_repository_directory(
     execution_run_id: uuid.UUID,
     *,
@@ -51,6 +56,7 @@ def sandbox_repository_directory(
     )
 
 
+# Purpose: Create sandbox copy for the sandbox execution workflow.
 def create_sandbox_copy(
     *,
     execution_run_id: uuid.UUID,
@@ -92,6 +98,7 @@ def create_sandbox_copy(
     return destination_root
 
 
+# Purpose: Handle ignore sandbox paths for the sandbox execution workflow.
 def ignore_sandbox_paths(
     directory: str,
     names: list[str],
@@ -109,6 +116,7 @@ def ignore_sandbox_paths(
     return ignored
 
 
+# Purpose: Clean up sandbox for the sandbox execution workflow.
 def cleanup_sandbox(
     run_directory: Path,
     *,

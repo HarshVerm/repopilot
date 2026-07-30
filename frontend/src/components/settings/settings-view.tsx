@@ -1,15 +1,25 @@
 "use client";
 
+// Module purpose: Render and coordinate the settings view interface.
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Github, LogOut, Settings } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getCurrentUser, getGitHubSetupUrl, listInstallations, logout } from "@/lib/api/auth";
+import {
+  getCurrentUser,
+  getGitHubSetupUrl,
+  getGitHubUserAuthorization,
+  getGitHubUserAuthorizationSetupUrl,
+  listInstallations,
+  logout,
+} from "@/lib/api/auth";
 import { queryKeys } from "@/lib/query-client";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 
+/** Purpose: Render the settings view interface. */
 export function SettingsView() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,6 +27,8 @@ export function SettingsView() {
   const githubNotice =
     searchParams.get("github") === "connected"
       ? "GitHub repository access is connected and synchronized."
+      : searchParams.get("github") === "attribution-connected"
+        ? "Pull requests will now be created as your GitHub user."
       : searchParams.get("github") === "approval-required"
         ? "Organization approval required. Ask a GitHub organization owner to approve RepoPilot."
         : null;
@@ -28,8 +40,16 @@ export function SettingsView() {
     queryKey: queryKeys.installations,
     queryFn: ({ signal }) => listInstallations(signal),
   });
+  const userAuthorizationQuery = useQuery({
+    queryKey: queryKeys.githubUserAuthorization,
+    queryFn: ({ signal }) => getGitHubUserAuthorization(signal),
+  });
   const setupMutation = useMutation({
     mutationFn: getGitHubSetupUrl,
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+  const userAuthorizationMutation = useMutation({
+    mutationFn: getGitHubUserAuthorizationSetupUrl,
     onSuccess: ({ url }) => window.location.assign(url),
   });
   const logoutMutation = useMutation({
@@ -64,13 +84,21 @@ export function SettingsView() {
             </div>
           ) : null}
 
-          {userQuery.isPending || installationsQuery.isPending ? (
+          {userQuery.isPending ||
+          installationsQuery.isPending ||
+          userAuthorizationQuery.isPending ? (
             <LoadingState title="Loading GitHub settings" rows={4} />
           ) : null}
           {userQuery.isError ? <ErrorState error={userQuery.error} onRetry={() => userQuery.refetch()} /> : null}
           {installationsQuery.isError ? <ErrorState error={installationsQuery.error} onRetry={() => installationsQuery.refetch()} /> : null}
+          {userAuthorizationQuery.isError ? (
+            <ErrorState
+              error={userAuthorizationQuery.error}
+              onRetry={() => userAuthorizationQuery.refetch()}
+            />
+          ) : null}
 
-          {userQuery.data ? (
+          {userQuery.data && userAuthorizationQuery.data ? (
             <section className="rounded-lg border border-[#30363D] bg-[#161B22] p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Connected account</h2>
               <div className="mt-4 flex items-center justify-between gap-4">
@@ -80,7 +108,37 @@ export function SettingsView() {
                   </p>
                   <p className="mt-1 font-code text-xs text-zinc-500">@{userQuery.data.github_login}</p>
                 </div>
-                <StatusBadge status="connected" />
+                <StatusBadge
+                  status={
+                    userAuthorizationQuery.data.connected
+                      ? "connected"
+                      : "reauthorization_required"
+                  }
+                />
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-4 border-t border-[#30363D] pt-4">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-100">
+                    Pull request attribution
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    {userAuthorizationQuery.data.connected
+                      ? `New pull requests are created as @${userAuthorizationQuery.data.attributed_login}.`
+                      : "Reconnect GitHub once to create pull requests as your user instead of the App bot."}
+                  </p>
+                </div>
+                {!userAuthorizationQuery.data.connected ? (
+                  <button
+                    type="button"
+                    onClick={() => userAuthorizationMutation.mutate()}
+                    disabled={userAuthorizationMutation.isPending}
+                    className="shrink-0 rounded-md border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50"
+                  >
+                    {userAuthorizationMutation.isPending
+                      ? "Connecting…"
+                      : "Connect User"}
+                  </button>
+                ) : null}
               </div>
             </section>
           ) : null}
@@ -122,6 +180,9 @@ export function SettingsView() {
           ) : null}
 
           {setupMutation.isError ? <ErrorState error={setupMutation.error} /> : null}
+          {userAuthorizationMutation.isError ? (
+            <ErrorState error={userAuthorizationMutation.error} />
+          ) : null}
           {logoutMutation.isError ? <ErrorState error={logoutMutation.error} /> : null}
 
           <section className="flex items-center justify-between rounded-lg border border-[#30363D] bg-[#161B22] p-5">

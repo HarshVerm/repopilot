@@ -1,3 +1,5 @@
+# Module purpose: Implement authorization behavior for the authentication domain.
+
 import uuid
 
 from fastapi import HTTPException
@@ -9,6 +11,7 @@ from app.services.auth.service import AuthContext, auth_error
 from app.services.tasks.service import TaskService
 
 
+# Purpose: Authorize task for the authentication workflow.
 async def authorize_task(
     *,
     task_id: uuid.UUID | None,

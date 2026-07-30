@@ -1,5 +1,8 @@
+// Module purpose: Provide reusable errors frontend utilities.
+
 import { isApiError } from "./api/client";
 
+/** Purpose: Handle error title for this frontend module. */
 export function errorTitle(error: unknown) {
   if (!isApiError(error)) {
     return "Something went wrong";
@@ -17,6 +20,7 @@ export function errorTitle(error: unknown) {
   return "Request failed";
 }
 
+/** Purpose: Handle error message for this frontend module. */
 export function errorMessage(error: unknown) {
   if (isApiError(error)) {
     if (error.status === 403) {

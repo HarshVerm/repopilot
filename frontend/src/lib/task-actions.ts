@@ -1,7 +1,10 @@
+// Module purpose: Provide reusable task actions frontend utilities.
+
 import type { PublicationResponse, TaskResponse } from "@/types/api";
 import type { TaskAction } from "@/types/task";
 import { isCancellableStatus } from "./task-status";
 
+/** Purpose: Handle can retry publication for this frontend module. */
 export function canRetryPublication(
   task: TaskResponse,
   publication?: PublicationResponse | null,
@@ -16,6 +19,7 @@ export function canRetryPublication(
   );
 }
 
+/** Purpose: Return available task actions for this frontend workflow. */
 export function getAvailableTaskActions(
   task: TaskResponse,
   publication?: PublicationResponse | null,

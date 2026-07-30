@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the system status view interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { Database, Server } from "lucide-react";
 import type { ReactNode } from "react";
@@ -10,6 +12,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { getHealth, getReadiness } from "@/lib/api/health";
 import { queryKeys } from "@/lib/query-client";
 
+/** Purpose: Render the system status view interface. */
 export function SystemStatusView() {
   const health = useQuery({
     queryKey: queryKeys.health,
@@ -69,6 +72,7 @@ export function SystemStatusView() {
   );
 }
 
+/** Purpose: Render the status card interface. */
 function StatusCard({
   icon,
   label,

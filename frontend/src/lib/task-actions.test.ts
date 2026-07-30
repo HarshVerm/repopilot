@@ -63,6 +63,7 @@ function publication(
     remote_head_sha: null,
     pull_request_number: null,
     pull_request_url: null,
+    pull_request_author_login: null,
     retry_count: 0,
     error_message: null,
     failure_stage: null,

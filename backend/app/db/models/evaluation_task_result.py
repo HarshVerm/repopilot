@@ -1,3 +1,5 @@
+# Module purpose: Define persistent evaluation task result database models.
+
 import uuid
 from datetime import datetime
 
@@ -21,6 +23,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist evaluation task result records.
 class EvaluationTaskResult(Base):
     __tablename__ = "evaluation_task_results"
 

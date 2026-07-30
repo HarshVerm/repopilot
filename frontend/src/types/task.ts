@@ -1,3 +1,5 @@
+// Module purpose: Define shared task TypeScript contracts.
+
 import type { TaskStatus } from "./api";
 
 export type TaskTab =

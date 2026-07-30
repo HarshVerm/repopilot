@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the final review domain.
+
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,31 +65,39 @@ SUPERSEDED = "superseded"
 CHANGES_REQUESTED = "changes_requested"
 
 
+# Purpose: Signal review not eligible failures.
 class ReviewNotEligibleError(ValueError):
     pass
 
 
+# Purpose: Signal review already exists failures.
 class ReviewAlreadyExistsError(ValueError):
     pass
 
 
+# Purpose: Signal review integrity failures.
 class ReviewIntegrityError(ValueError):
     pass
 
 
+# Purpose: Signal review state failures.
 class ReviewStateError(ValueError):
     pass
 
 
+# Purpose: Signal workspace drift failures.
 class WorkspaceDriftError(ReviewIntegrityError):
     pass
 
 
+# Purpose: Signal execution mismatch failures.
 class ExecutionMismatchError(ReviewIntegrityError):
     pass
 
 
+# Purpose: Coordinate review operations.
 class ReviewService:
+    # Purpose: Return review for the final review workflow.
     async def get_review(
         self,
         *,
@@ -99,6 +109,7 @@ class ReviewService:
             review_id,
         )
 
+    # Purpose: Create review for the final review workflow.
     async def create_review(
         self,
         *,
@@ -288,6 +299,7 @@ class ReviewService:
 
         return review
 
+    # Purpose: Approve review for the final review workflow.
     async def approve_review(
         self,
         *,
@@ -361,6 +373,7 @@ class ReviewService:
 
         return review
 
+    # Purpose: Reject review for the final review workflow.
     async def reject_review(
         self,
         *,
@@ -417,6 +430,7 @@ class ReviewService:
 
         return review
 
+    # Purpose: Request changes for the final review workflow.
     async def request_changes(
         self,
         *,
@@ -461,17 +475,6 @@ class ReviewService:
                 task_id=review.task_id,
                 db=db,
             )
-            prior = (task.user_instructions or "").strip()
-            feedback_context = (
-                f"Final review feedback (revision "
-                f"{review.review_version}):\n{clean_feedback}"
-            )
-            task.user_instructions = (
-                f"{prior}\n\n{feedback_context}"
-                if prior
-                else feedback_context
-            )[:10_000]
-            await db.commit()
             await TaskService().transition_task(
                 task_id=review.task_id,
                 new_status="coding",
@@ -486,6 +489,7 @@ class ReviewService:
             )
         return review
 
+    # Purpose: Validate expected review for the final review workflow.
     def validate_expected_review(
         self,
         *,
@@ -504,6 +508,7 @@ class ReviewService:
                 "The task changed while it was being reviewed"
             )
 
+    # Purpose: Revalidate review integrity for the final review workflow.
     async def revalidate_review_integrity(
         self,
         *,
@@ -558,6 +563,7 @@ class ReviewService:
             allow_diff_hash_backfill=False,
         )
 
+    # Purpose: Verify current workspace for the final review workflow.
     async def verify_current_workspace(
         self,
         *,
@@ -611,6 +617,7 @@ class ReviewService:
 
         return diff_summary
 
+    # Purpose: Find successful execution run for the final review workflow.
     async def find_successful_execution_run(
         self,
         change_set: ChangeSet,
@@ -640,6 +647,7 @@ class ReviewService:
 
         return execution_run
 
+    # Purpose: Require final change set, raising an error when unavailable.
     async def require_final_change_set(
         self,
         change_set: ChangeSet,
@@ -661,6 +669,7 @@ class ReviewService:
                 "Only the final ChangeSet in the ancestry chain can be reviewed"
             )
 
+    # Purpose: Find existing review for the final review workflow.
     async def find_existing_review(
         self,
         *,
@@ -687,6 +696,7 @@ class ReviewService:
 
         return result.first()
 
+    # Purpose: Build debug history for the final review workflow.
     async def build_debug_history(
         self,
         *,
@@ -758,6 +768,7 @@ class ReviewService:
             ],
         }
 
+    # Purpose: Handle change set chain ids for the final review workflow.
     async def change_set_chain_ids(
         self,
         final_change_set: ChangeSet,
@@ -788,6 +799,7 @@ class ReviewService:
 
         return chain_ids
 
+    # Purpose: Load review for the final review workflow.
     async def load_review(
         self,
         review_id: uuid.UUID,
@@ -813,6 +825,7 @@ class ReviewService:
 
         return review
 
+    # Purpose: Load change set for the final review workflow.
     async def load_change_set(
         self,
         change_set_id: uuid.UUID,
@@ -834,6 +847,7 @@ class ReviewService:
 
         return change_set
 
+    # Purpose: Load plan for the final review workflow.
     async def load_plan(
         self,
         plan_id: uuid.UUID,
@@ -851,6 +865,7 @@ class ReviewService:
 
         return plan
 
+    # Purpose: Load execution run for the final review workflow.
     async def load_execution_run(
         self,
         execution_run_id: uuid.UUID,
@@ -869,6 +884,7 @@ class ReviewService:
         return run
 
 
+# Purpose: Validate plan for review for the final review workflow.
 def validate_plan_for_review(
     plan: ExecutionPlan,
 ) -> None:
@@ -878,6 +894,7 @@ def validate_plan_for_review(
         )
 
 
+# Purpose: Validate change set for review for the final review workflow.
 def validate_change_set_for_review(
     change_set: ChangeSet,
 ) -> None:
@@ -887,6 +904,7 @@ def validate_change_set_for_review(
         )
 
 
+# Purpose: Validate execution for review for the final review workflow.
 def validate_execution_for_review(
     *,
     change_set: ChangeSet,
@@ -908,6 +926,7 @@ def validate_execution_for_review(
         )
 
 
+# Purpose: Validate workspace relationships for the final review workflow.
 def validate_workspace_relationships(
     *,
     plan: ExecutionPlan,
@@ -963,6 +982,7 @@ def validate_workspace_relationships(
             )
 
 
+# Purpose: Handle file metadata for the final review workflow.
 def file_metadata(
     diff_summary: DiffSummary,
 ) -> list[dict]:
@@ -979,6 +999,7 @@ def file_metadata(
     ]
 
 
+# Purpose: Handle verification summary for the final review workflow.
 def verification_summary(
     execution_run: ExecutionRun,
 ) -> dict:
@@ -1021,6 +1042,7 @@ def verification_summary(
     }
 
 
+# Purpose: Build risk summary for the final review workflow.
 def build_risk_summary(
     *,
     files: list[dict],
@@ -1074,6 +1096,7 @@ def build_risk_summary(
     )
 
 
+# Purpose: Issue snapshot for the final review workflow.
 def issue_snapshot(
     plan: ExecutionPlan,
 ) -> dict:
@@ -1088,6 +1111,7 @@ def issue_snapshot(
     }
 
 
+# Purpose: Handle plan snapshot for the final review workflow.
 def plan_snapshot(
     plan: ExecutionPlan,
 ) -> dict:
@@ -1106,6 +1130,7 @@ def plan_snapshot(
     }
 
 
+# Purpose: Serialize final review for the final review workflow.
 def serialize_final_review(
     review: FinalReview,
 ) -> dict:
@@ -1159,6 +1184,7 @@ def serialize_final_review(
     }
 
 
+# Purpose: Serialize review decision for the final review workflow.
 def serialize_review_decision(
     review: FinalReview,
 ) -> dict:
@@ -1176,6 +1202,7 @@ def serialize_review_decision(
     }
 
 
+# Purpose: Handle isoformat for the final review workflow.
 def isoformat(
     value,
 ) -> str | None:

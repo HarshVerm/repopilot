@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the debug attempt list interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { Bug } from "lucide-react";
 import type { TaskResponse } from "@/types/api";
@@ -23,6 +25,7 @@ interface DebugAttempt {
   needs_plan_revision?: boolean;
 }
 
+/** Purpose: Render the debug attempt list interface. */
 export function DebugAttemptList({ task }: { task: TaskResponse }) {
   const reviewQuery = useQuery({
     queryKey: task.active_review_id ? queryKeys.review(task.active_review_id) : ["review", "none"],
@@ -95,6 +98,7 @@ export function DebugAttemptList({ task }: { task: TaskResponse }) {
   );
 }
 
+/** Purpose: Render the pair interface. */
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">

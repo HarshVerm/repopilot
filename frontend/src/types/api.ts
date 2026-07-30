@@ -1,3 +1,5 @@
+// Module purpose: Define shared api TypeScript contracts.
+
 export type TaskStatus =
   | "created"
   | "repository_preparing"
@@ -145,6 +147,14 @@ export interface CurrentUserResponse {
   github_name: string | null;
   github_avatar_url: string | null;
   github_email: string | null;
+}
+
+export interface GitHubUserAuthorizationResponse {
+  connected: boolean;
+  status: string;
+  attributed_login: string;
+  access_token_expires_at: string | null;
+  refresh_token_expires_at: string | null;
 }
 
 export interface GitHubInstallationResponse {
@@ -356,6 +366,7 @@ export interface PublicationResponse {
   remote_head_sha: string | null;
   pull_request_number: number | null;
   pull_request_url: string | null;
+  pull_request_author_login: string | null;
   retry_count: number;
   error_message: string | null;
   failure_stage: string | null;

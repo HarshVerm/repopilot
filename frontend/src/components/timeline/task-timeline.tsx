@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task timeline interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { Clock } from "lucide-react";
 import type { TaskResponse } from "@/types/api";
@@ -10,6 +12,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 
+/** Purpose: Render the task timeline interface. */
 export function TaskTimeline({ task }: { task: TaskResponse }) {
   const query = useQuery({
     queryKey: queryKeys.taskTimeline(task.task_id),
@@ -57,6 +60,7 @@ export function TaskTimeline({ task }: { task: TaskResponse }) {
   );
 }
 
+/** Purpose: Handle timeline message for this frontend module. */
 function timelineMessage(event: {
   message: string | null;
   status: string | null;

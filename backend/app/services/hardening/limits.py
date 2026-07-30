@@ -1,3 +1,5 @@
+# Module purpose: Implement limits behavior for the application hardening domain.
+
 from pathlib import Path
 from typing import Any
 
@@ -85,10 +87,12 @@ CONFIGURATION_SNAPSHOT_FIELDS = (
 )
 
 
+# Purpose: Signal startup configuration failures.
 class StartupConfigurationError(ValueError):
     pass
 
 
+# Purpose: Handle configuration snapshot for the application hardening workflow.
 def configuration_snapshot(
     configured_settings: Settings = settings,
 ) -> dict[str, Any]:
@@ -100,6 +104,7 @@ def configuration_snapshot(
     }
 
 
+# Purpose: Handle safe config value for the application hardening workflow.
 def _safe_config_value(
     value: Any,
 ) -> Any:
@@ -112,6 +117,7 @@ def _safe_config_value(
     return value
 
 
+# Purpose: Validate startup configuration for the application hardening workflow.
 def validate_startup_configuration(
     configured_settings: Settings = settings,
 ) -> None:
@@ -150,6 +156,7 @@ def validate_startup_configuration(
         )
 
 
+# Purpose: Validate safe root for the application hardening workflow.
 def validate_safe_root(
     path: Path,
     *,
@@ -173,6 +180,7 @@ def validate_safe_root(
         )
 
 
+# Purpose: Handle hardening checklist for the application hardening workflow.
 def hardening_checklist() -> list[dict[str, str]]:
     return [
         checklist_item(
@@ -233,6 +241,7 @@ def hardening_checklist() -> list[dict[str, str]]:
     ]
 
 
+# Purpose: Handle checklist item for the application hardening workflow.
 def checklist_item(
     control: str,
     status: str,

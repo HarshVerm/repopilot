@@ -1,3 +1,5 @@
+# Module purpose: Implement diff behavior for the change-set domain.
+
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +16,7 @@ from app.services.chunking.chunker import (
 )
 
 
+# Purpose: Encapsulate changed file metadata behavior for the change-set domain.
 @dataclass(frozen=True)
 class ChangedFileMetadata:
     path: str
@@ -23,6 +26,7 @@ class ChangedFileMetadata:
     lines_deleted: int
 
 
+# Purpose: Encapsulate diff summary behavior for the change-set domain.
 @dataclass(frozen=True)
 class DiffSummary:
     diff: str
@@ -31,12 +35,14 @@ class DiffSummary:
     lines_deleted: int
 
 
+# Purpose: Handle sha256 bytes for the change-set workflow.
 def sha256_bytes(
     content: bytes,
 ) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+# Purpose: Summarize diff for the change-set workflow.
 def summarize_diff(
     repository_path: Path,
 ) -> DiffSummary:

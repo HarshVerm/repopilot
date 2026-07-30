@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the repositories view interface.
+
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Archive, Github, Lock, Search } from "lucide-react";
 import { useState } from "react";
@@ -10,6 +12,7 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 
+/** Purpose: Render the repositories view interface. */
 export function RepositoriesView() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);

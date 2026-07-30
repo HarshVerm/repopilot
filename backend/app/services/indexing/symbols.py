@@ -1,3 +1,5 @@
+"""Extract searchable code symbols from Tree-sitter syntax trees."""
+
 from dataclasses import dataclass
 
 
@@ -29,6 +31,8 @@ FUNCTION_VALUE_TYPES = {
 
 @dataclass
 class CodeSymbolInfo:
+    """Describe one symbol and its one-based location in a source file."""
+
     kind: str
     name: str
     start_line: int
@@ -39,6 +43,7 @@ def get_node_text(
     source: bytes,
     node,
 ) -> str:
+    """Decode the exact source text covered by a Tree-sitter node."""
     return source[
         node.start_byte:node.end_byte
     ].decode("utf-8", errors="ignore")
@@ -48,6 +53,7 @@ def get_symbol_kind(
     node,
     symbol_types: dict[str, str],
 ) -> str | None:
+    """Map an AST node to a symbol kind, including function variables."""
     kind = symbol_types.get(
         node.type
     )
@@ -72,6 +78,7 @@ def extract_symbols(
     source: bytes,
     tree,
 ) -> list[CodeSymbolInfo]:
+    """Walk an AST and return the named symbols used by structural search."""
 
     if language == "python":
         symbol_types = PYTHON_SYMBOL_TYPES

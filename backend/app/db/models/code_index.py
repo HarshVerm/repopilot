@@ -1,3 +1,5 @@
+# Module purpose: Define persistent code index database models.
+
 import uuid
 
 from sqlalchemy import (
@@ -19,6 +21,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist repository file records.
 class RepositoryFile(Base):
     __tablename__ = "repository_files"
 
@@ -69,6 +72,7 @@ class RepositoryFile(Base):
     )
 
 
+# Purpose: Persist code symbol records.
 class CodeSymbol(Base):
     __tablename__ = "code_symbols"
 

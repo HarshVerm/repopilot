@@ -1,3 +1,5 @@
+# Module purpose: Implement manager behavior for the repository workspace domain.
+
 import asyncio
 import shutil
 from pathlib import Path
@@ -16,8 +18,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 WORKSPACES_DIR = PROJECT_ROOT / "workspaces"
 
 
+# Purpose: Coordinate workspace operations.
 class WorkspaceManager:
 
+    # Purpose: Clone repository for the repository workspace workflow.
     async def clone_repository(
         self,
         repository_url: str,

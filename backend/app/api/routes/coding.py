@@ -1,3 +1,5 @@
+# Module purpose: Define coding HTTP API routes.
+
 import time
 from uuid import UUID
 
@@ -68,10 +70,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return coder runner for the HTTP API workflow.
 def get_coder_runner():
     return AgentsCoderRunner()
 
 
+# Purpose: Handle implement plan for the HTTP API workflow.
 @router.post(
     "/plans/{plan_id}/implement",
     response_model=ImplementPlanResponse,
@@ -241,6 +245,7 @@ async def implement_plan(
     )
 
 
+# Purpose: Return change set diff for the HTTP API workflow.
 @router.get(
     "/change-sets/{change_set_id}/diff",
     response_model=ChangeSetDiffResponse,

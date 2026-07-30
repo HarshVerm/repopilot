@@ -1,3 +1,5 @@
+# Module purpose: Define github HTTP API routes.
+
 import uuid
 from typing import Annotated
 
@@ -44,10 +46,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return github app client for the GitHub integration workflow.
 def get_github_app_client() -> GitHubAppClient:
     return github_app_client
 
 
+# Purpose: List installations for the GitHub integration workflow.
 @router.get(
     "/installations",
     response_model=GitHubInstallationListResponse,
@@ -87,6 +91,7 @@ async def list_installations(
     }
 
 
+# Purpose: Synchronize installation repositories for the GitHub integration workflow.
 @router.post(
     "/installations/{installation_id}/repositories/sync",
     response_model=ConnectedRepositoryListResponse,
@@ -118,6 +123,7 @@ async def sync_installation_repositories(
     }
 
 
+# Purpose: List connected repositories for the GitHub integration workflow.
 @router.get(
     "/repositories",
     response_model=ConnectedRepositoryListResponse,
@@ -216,6 +222,7 @@ async def list_connected_repositories(
     }
 
 
+# Purpose: Return connected repository for the GitHub integration workflow.
 @router.get(
     "/repositories/{repository_id}",
     response_model=ConnectedRepositoryResponse,
@@ -233,6 +240,7 @@ async def get_connected_repository(
     return serialize_repository(repository)
 
 
+# Purpose: List connected repository issues for the GitHub integration workflow.
 @router.get(
     "/repositories/{repository_id}/issues",
     response_model=IssueListResponse,
@@ -297,6 +305,7 @@ async def list_connected_repository_issues(
     }
 
 
+# Purpose: Return connected repository issue for the GitHub integration workflow.
 @router.get(
     "/repositories/{repository_id}/issues/{issue_number}",
     response_model=IssueResponse,
@@ -337,6 +346,7 @@ async def get_connected_repository_issue(
     return map_issue(issue)
 
 
+# Purpose: Resolve user repository for the GitHub integration workflow.
 async def resolve_user_repository(
     *,
     repository_id: uuid.UUID,
@@ -377,6 +387,7 @@ async def resolve_user_repository(
     return repository, installation
 
 
+# Purpose: Serialize installation for the GitHub integration workflow.
 def serialize_installation(
     installation: GitHubInstallation,
     repository_count: int,
@@ -401,6 +412,7 @@ def serialize_installation(
     }
 
 
+# Purpose: Serialize repository for the GitHub integration workflow.
 def serialize_repository(repository: Repository) -> dict:
     return {
         "id": str(repository.id),
@@ -424,6 +436,7 @@ def serialize_repository(repository: Repository) -> dict:
     }
 
 
+# Purpose: Escape like for the GitHub integration workflow.
 def escape_like(value: str) -> str:
     return (
         value.replace("\\", "\\\\")
@@ -434,6 +447,7 @@ def escape_like(value: str) -> str:
 
 # Legacy owner/repository routes are retained for explicitly enabled local and
 # evaluation workflows. They never expose tenant-owned repository records.
+# Purpose: Return repository for the GitHub integration workflow.
 @router.get(
     "/repos/{owner}/{repo}",
     response_model=RepositoryResponse,
@@ -452,6 +466,7 @@ async def get_repository(owner: str, repo: str):
         raise
 
 
+# Purpose: List repository issues for the GitHub integration workflow.
 @router.get(
     "/repos/{owner}/{repo}/issues",
     response_model=list[IssueResponse],
@@ -474,6 +489,7 @@ async def list_repository_issues(
     ]
 
 
+# Purpose: Return repository issue for the GitHub integration workflow.
 @router.get(
     "/repos/{owner}/{repo}/issues/{issue_number}",
     response_model=IssueResponse,
@@ -505,6 +521,7 @@ async def get_repository_issue(
         raise
 
 
+# Purpose: Require legacy github api, raising an error when unavailable.
 def require_legacy_github_api() -> None:
     if not settings.allow_legacy_unauthenticated_api:
         raise auth_error(

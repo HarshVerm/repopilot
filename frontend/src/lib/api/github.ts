@@ -1,3 +1,5 @@
+// Module purpose: Provide typed API operations for github.
+
 import type {
   ConnectedRepositoryListResponse,
   ConnectedRepositoryResponse,
@@ -6,6 +8,7 @@ import type {
 } from "@/types/api";
 import { apiRequest } from "./client";
 
+/** Purpose: List connected repositories for this frontend workflow. */
 export function listConnectedRepositories(
   options: {
     search?: string;
@@ -28,6 +31,7 @@ export function listConnectedRepositories(
   );
 }
 
+/** Purpose: Return connected repository for this frontend workflow. */
 export function getConnectedRepository(
   repositoryId: string,
   signal?: AbortSignal,
@@ -38,6 +42,7 @@ export function getConnectedRepository(
   );
 }
 
+/** Purpose: List connected repository issues for this frontend workflow. */
 export function listConnectedRepositoryIssues(
   repositoryId: string,
   options: { search?: string; page?: number; perPage?: number } = {},
@@ -55,6 +60,7 @@ export function listConnectedRepositoryIssues(
   );
 }
 
+/** Purpose: Return connected repository issue for this frontend workflow. */
 export function getConnectedRepositoryIssue(
   repositoryId: string,
   issueNumber: number,

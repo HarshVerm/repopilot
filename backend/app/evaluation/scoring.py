@@ -1,3 +1,5 @@
+# Module purpose: Implement scoring behavior for the evaluation domain.
+
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,7 @@ RECALL_K_VALUES = (
 )
 
 
+# Purpose: Handle file level retrieval scores for the evaluation workflow.
 def file_level_retrieval_scores(
     *,
     relevant_files: list[str],
@@ -53,6 +56,7 @@ def file_level_retrieval_scores(
     return scores
 
 
+# Purpose: Handle unique ranked files for the evaluation workflow.
 def unique_ranked_files(
     ranked_results: list[dict[str, Any]],
 ) -> list[str]:
@@ -82,6 +86,7 @@ def unique_ranked_files(
     return ranked_files
 
 
+# Purpose: Handle recall at k for the evaluation workflow.
 def recall_at_k(
     *,
     relevant_files: set[str],
@@ -99,6 +104,7 @@ def recall_at_k(
     ) / len(relevant_files)
 
 
+# Purpose: Handle precision at k for the evaluation workflow.
 def precision_at_k(
     *,
     relevant_files: set[str],
@@ -114,6 +120,7 @@ def precision_at_k(
     ) / k
 
 
+# Purpose: Handle planner file metrics for the evaluation workflow.
 def planner_file_metrics(
     *,
     task: EvaluationTask,
@@ -190,6 +197,7 @@ def planner_file_metrics(
     }
 
 
+# Purpose: Handle verification from execution run for the evaluation workflow.
 def verification_from_execution_run(
     execution_run,
 ) -> VerificationResults:
@@ -212,6 +220,7 @@ def verification_from_execution_run(
     )
 
 
+# Purpose: Handle status to verification for the evaluation workflow.
 def status_to_verification(
     status: str | None,
 ) -> str:
@@ -229,6 +238,7 @@ def status_to_verification(
     return "ERROR"
 
 
+# Purpose: Build task result for the evaluation workflow.
 def build_task_result(
     *,
     task: EvaluationTask,
@@ -347,6 +357,7 @@ def build_task_result(
     )
 
 
+# Purpose: Normalize file path for the evaluation workflow.
 def normalize_file_path(
     path: str,
 ) -> str:

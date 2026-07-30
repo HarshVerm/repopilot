@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the AI agent domain.
+
 from app.core.config import settings
 from app.db.models.change_set import (
     ChangeSet,
@@ -16,6 +18,7 @@ from app.services.debugging.failure_classifier import (
 )
 
 
+# Purpose: Build debugger input for the AI agent workflow.
 def build_debugger_input(
     *,
     plan: ExecutionPlan,
@@ -84,6 +87,7 @@ def build_debugger_input(
     return "\n".join(sections)
 
 
+# Purpose: Handle trim log for the AI agent workflow.
 def trim_log(
     text: str,
 ) -> str:

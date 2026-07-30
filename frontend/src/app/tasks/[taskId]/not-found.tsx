@@ -1,5 +1,8 @@
+// Module purpose: Render the missing-resource state for this application route.
+
 import Link from "next/link";
 
+/** Purpose: Render the task not found interface. */
 export default function TaskNotFound() {
   return (
     <div className="flex flex-1 items-center justify-center p-6">

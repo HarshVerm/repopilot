@@ -1,3 +1,5 @@
+# Module purpose: Define evaluation HTTP API routes.
+
 from uuid import UUID
 
 from fastapi import (
@@ -37,6 +39,7 @@ router = APIRouter(
 )
 
 
+# Purpose: Run evaluation for the evaluation workflow.
 @router.post(
     "",
     response_model=EvaluationRunResponse,
@@ -85,6 +88,7 @@ async def run_evaluation(
         ) from exc
 
 
+# Purpose: Return evaluation run for the evaluation workflow.
 @router.get(
     "/{evaluation_run_id}",
     response_model=EvaluationRunRecordResponse,
@@ -117,6 +121,7 @@ async def get_evaluation_run(
     )
 
 
+# Purpose: Authorize evaluation api for the evaluation workflow.
 def authorize_evaluation_api(
     auth: AuthContext | None,
 ) -> None:

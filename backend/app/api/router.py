@@ -1,3 +1,5 @@
+# Module purpose: Implement router behavior for the HTTP API domain.
+
 from fastapi import APIRouter
 
 from app.api.routes.github import (

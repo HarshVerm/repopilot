@@ -1,3 +1,5 @@
+# Module purpose: Implement commands behavior for the sandbox execution domain.
+
 from dataclasses import dataclass
 
 from app.core.config import settings
@@ -17,6 +19,7 @@ from app.services.sandbox.results import (
 )
 
 
+# Purpose: Signal command policy failures.
 class CommandPolicyError(ValueError):
     pass
 
@@ -43,6 +46,7 @@ NO_VERIFICATION_COMMANDS_REASON = (
 )
 
 
+# Purpose: Encapsulate command plan behavior for the sandbox execution domain.
 @dataclass(frozen=True)
 class CommandPlan:
     commands: list[ExecutionCommand]
@@ -50,6 +54,7 @@ class CommandPlan:
     metadata: dict
 
 
+# Purpose: Build command plan for the sandbox execution workflow.
 def build_command_plan(
     detection: ProjectDetection,
 ) -> CommandPlan:
@@ -116,6 +121,7 @@ def build_command_plan(
     )
 
 
+# Purpose: Add node commands for the sandbox execution workflow.
 def add_node_commands(
     package_manager: str,
     lockfile: str | None,
@@ -151,6 +157,7 @@ def add_node_commands(
             )
 
 
+# Purpose: Handle node install command for the sandbox execution workflow.
 def node_install_command(
     package_manager: str,
     lockfile: str | None,
@@ -199,6 +206,7 @@ def node_install_command(
     )
 
 
+# Purpose: Handle node script command for the sandbox execution workflow.
 def node_script_command(
     package_manager: str,
     command_type: str,
@@ -241,6 +249,7 @@ def node_script_command(
     )
 
 
+# Purpose: Add python commands for the sandbox execution workflow.
 def add_python_commands(
     package_manager: str,
     has_tests: bool,
@@ -302,6 +311,7 @@ def add_python_commands(
         )
 
 
+# Purpose: Handle python install command for the sandbox execution workflow.
 def python_install_command(
     package_manager: str,
     has_requirements: bool,
@@ -372,6 +382,7 @@ def python_install_command(
     )
 
 
+# Purpose: Ensure allowed for the sandbox execution workflow.
 def ensure_allowed(
     command: ExecutionCommand,
 ) -> ExecutionCommand:

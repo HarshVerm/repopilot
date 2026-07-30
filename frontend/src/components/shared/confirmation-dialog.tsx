@@ -1,8 +1,11 @@
 "use client";
 
+// Module purpose: Render and coordinate the confirmation dialog interface.
+
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
+/** Purpose: Render the confirmation dialog interface. */
 export function ConfirmationDialog({
   open,
   title,
@@ -13,6 +16,9 @@ export function ConfirmationDialog({
   pending = false,
   error,
   reason,
+  reasonLabel = "Reason",
+  reasonPlaceholder = "Optional reason",
+  reasonRequired = false,
   onReasonChange,
   onConfirm,
   onCancel,
@@ -26,20 +32,30 @@ export function ConfirmationDialog({
   pending?: boolean;
   error?: string;
   reason?: string;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  reasonRequired?: boolean;
   onReasonChange?: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const reasonIsMissing = reasonRequired && !(reason ?? "").trim();
 
   useEffect(() => {
     if (open) {
-      confirmRef.current?.focus();
+      if (onReasonChange) {
+        reasonRef.current?.focus();
+      } else {
+        confirmRef.current?.focus();
+      }
     }
-  }, [open]);
+  }, [onReasonChange, open]);
 
   useEffect(() => {
     if (!open) return;
+    /** Purpose: Handle on key down for this frontend module. */
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !pending) {
         onCancel();
@@ -81,13 +97,24 @@ export function ConfirmationDialog({
             </p>
           ) : null}
           {onReasonChange ? (
-            <textarea
-              value={reason}
-              onChange={(event) => onReasonChange(event.target.value)}
-              rows={4}
-              className="w-full rounded-lg border border-[#3F3F46] bg-[#0D1117] p-3 text-xs text-[#FAFAFA] placeholder:text-zinc-500"
-              placeholder="Optional reason"
-            />
+            <label className="block text-xs font-medium text-zinc-300">
+              {reasonLabel}
+              {reasonRequired ? (
+                <span className="ml-1 text-rose-300" aria-hidden="true">
+                  *
+                </span>
+              ) : null}
+              <textarea
+                ref={reasonRef}
+                value={reason}
+                onChange={(event) => onReasonChange(event.target.value)}
+                rows={4}
+                required={reasonRequired}
+                aria-required={reasonRequired}
+                className="mt-2 w-full rounded-lg border border-[#3F3F46] bg-[#0D1117] p-3 text-xs text-[#FAFAFA] placeholder:text-zinc-500"
+                placeholder={reasonPlaceholder}
+              />
+            </label>
           ) : null}
         </div>
         <div className="flex justify-end gap-3 border-t border-[#27272A] px-5 py-4">
@@ -103,7 +130,7 @@ export function ConfirmationDialog({
             type="button"
             ref={confirmRef}
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || reasonIsMissing}
             className={`rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50 ${
               variant === "danger"
                 ? "bg-rose-600 hover:bg-rose-500"

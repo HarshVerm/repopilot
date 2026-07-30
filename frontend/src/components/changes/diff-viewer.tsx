@@ -1,11 +1,14 @@
 "use client";
 
+// Module purpose: Render and coordinate the diff viewer interface.
+
 import { FileText, Maximize2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { parseUnifiedDiff } from "@/lib/diff";
 
+/** Purpose: Render the diff viewer interface. */
 export function DiffViewer({ diff }: { diff: string | null | undefined }) {
   const files = useMemo(() => parseUnifiedDiff(diff), [diff]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);

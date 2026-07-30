@@ -1,5 +1,8 @@
+// Module purpose: Render the [task id] application route.
+
 import { TaskDetailView } from "@/components/tasks/task-detail-view";
 
+/** Purpose: Render the task detail page interface. */
 export default async function TaskDetailPage({
   params,
 }: {

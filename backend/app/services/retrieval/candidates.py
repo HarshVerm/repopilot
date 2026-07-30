@@ -1,3 +1,5 @@
+"""Define the common candidate shape shared by all RAG retrievers."""
+
 import uuid
 from dataclasses import dataclass
 from typing import Literal
@@ -19,6 +21,8 @@ RETRIEVER_ORDER = {
 
 @dataclass(frozen=True)
 class RetrievalCandidate:
+    """Represent one ranked code chunk before or after result fusion."""
+
     chunk_id: uuid.UUID
     file_path: str
     symbol_name: str | None
@@ -36,6 +40,7 @@ class RetrievalCandidate:
 def ordered_sources(
     sources: set[RetrieverName],
 ) -> tuple[RetrieverName, ...]:
+    """Return matching retriever names in deterministic display order."""
     return tuple(
         sorted(
             sources,

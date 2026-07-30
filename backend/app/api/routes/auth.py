@@ -1,3 +1,5 @@
+# Module purpose: Define auth HTTP API routes.
+
 from urllib.parse import urlencode
 
 import httpx
@@ -17,7 +19,11 @@ from app.db.session import get_db
 from app.schemas.auth import (
     CurrentUserResponse,
     GitHubSetupResponse,
+    GitHubUserAuthorizationResponse,
     LogoutResponse,
+)
+from app.services.auth.github_tokens import (
+    GitHubUserTokenService,
 )
 from app.services.auth.service import (
     AuthContext,
@@ -44,6 +50,7 @@ router = APIRouter(
 )
 
 
+# Purpose: Handle github login for the authentication workflow.
 @router.get("/github/login")
 async def github_login(
     redirect_to: str = Query(default="/tasks"),
@@ -67,6 +74,7 @@ async def github_login(
     )
 
 
+# Purpose: Handle github callback for the authentication workflow.
 @router.get("/github/callback")
 async def github_callback(
     code: str,
@@ -86,6 +94,7 @@ async def github_callback(
     if state_record.purpose not in {
         "login",
         "installation_verification",
+        "user_authorization",
     }:
         raise auth_error(
             status_code=400,
@@ -93,9 +102,11 @@ async def github_callback(
             message="The GitHub authorization request is invalid.",
         )
     try:
-        access_token = await service.exchange_code(code)
+        token_set = await service.exchange_code(code)
         github_user, email, installations = (
-            await service.fetch_github_identity(access_token)
+            await service.fetch_github_identity(
+                token_set.access_token
+            )
         )
     except httpx.HTTPError as exc:
         raise auth_error(
@@ -105,21 +116,58 @@ async def github_callback(
         ) from exc
 
     installation_service = InstallationService()
-    if state_record.purpose == "installation_verification":
+    if state_record.purpose in {
+        "installation_verification",
+        "user_authorization",
+    }:
         if (
             auth is None
             or state_record.user_id != auth.user.id
             or int(github_user["id"])
             != auth.user.github_user_id
-            or state_record.github_installation_id is None
+            or (
+                state_record.purpose
+                == "installation_verification"
+                and state_record.github_installation_id
+                is None
+            )
         ):
+            user_authorization = (
+                state_record.purpose
+                == "user_authorization"
+            )
             raise auth_error(
                 status_code=403,
-                code="GITHUB_INSTALLATION_NOT_AUTHORIZED",
-                message=(
-                    "The GitHub installation does not belong to "
-                    "the signed-in account."
+                code=(
+                    "GITHUB_USER_AUTHORIZATION_MISMATCH"
+                    if user_authorization
+                    else "GITHUB_INSTALLATION_NOT_AUTHORIZED"
                 ),
+                message=(
+                    "The GitHub authorization does not match "
+                    "the signed-in account."
+                    if user_authorization
+                    else (
+                        "The GitHub installation does not belong to "
+                        "the signed-in account."
+                    )
+                ),
+            )
+        await service.upsert_user(
+            github_user=github_user,
+            email=email,
+            db=db,
+        )
+        await GitHubUserTokenService().store(
+            user_id=auth.user.id,
+            token_set=token_set,
+            db=db,
+        )
+        if state_record.purpose == "user_authorization":
+            return RedirectResponse(
+                f"{settings.frontend_url.rstrip('/')}"
+                f"{state_record.redirect_path}"
+                "?github=attribution-connected"
             )
         matching_payload = next(
             (
@@ -160,6 +208,11 @@ async def github_callback(
         email=email,
         db=db,
     )
+    await GitHubUserTokenService().store(
+        user_id=user.id,
+        token_set=token_set,
+        db=db,
+    )
     installation_records = (
         await installation_service.sync_installations(
             user_id=user.id,
@@ -196,6 +249,7 @@ async def github_callback(
     return response
 
 
+# Purpose: Handle current user for the authentication workflow.
 @router.get(
     "/me",
     response_model=CurrentUserResponse,
@@ -206,6 +260,54 @@ async def current_user(
     return serialize_user(user)
 
 
+# Purpose: Handle github user authorization for the authentication workflow.
+@router.get(
+    "/github/user-authorization",
+    response_model=GitHubUserAuthorizationResponse,
+)
+async def github_user_authorization(
+    user: User = Depends(require_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    status = await GitHubUserTokenService().status(
+        user_id=user.id,
+        db=db,
+    )
+    return GitHubUserAuthorizationResponse(
+        connected=status.connected,
+        status=status.status,
+        attributed_login=user.github_login,
+        access_token_expires_at=(
+            status.access_token_expires_at
+        ),
+        refresh_token_expires_at=(
+            status.refresh_token_expires_at
+        ),
+    )
+
+
+# Purpose: Handle github user authorization setup for the authentication workflow.
+@router.get(
+    "/github/user-authorization/setup",
+    response_model=GitHubSetupResponse,
+)
+async def github_user_authorization_setup(
+    redirect_to: str = Query(default="/settings"),
+    user: User = Depends(require_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    state = await AuthService().create_oauth_state(
+        db=db,
+        purpose="user_authorization",
+        user_id=user.id,
+        redirect_path=redirect_to,
+    )
+    return GitHubSetupResponse(
+        url=AuthService().github_login_url(state)
+    )
+
+
+# Purpose: Handle the logout step of the authentication flow.
 @router.post(
     "/logout",
     response_model=LogoutResponse,
@@ -233,6 +335,7 @@ async def logout(
     return LogoutResponse(logged_out=True)
 
 
+# Purpose: Handle github installation setup for the authentication workflow.
 @router.get(
     "/github/installations/setup",
     response_model=GitHubSetupResponse,
@@ -282,6 +385,7 @@ async def github_installation_setup(
     )
 
 
+# Purpose: Handle github installation callback for the authentication workflow.
 @router.get("/github/installations/callback")
 async def github_installation_callback(
     state: str,
@@ -317,6 +421,7 @@ async def github_installation_callback(
     )
 
 
+# Purpose: Set auth cookies for the authentication workflow.
 def set_auth_cookies(
     *,
     response: Response,
@@ -346,6 +451,7 @@ def set_auth_cookies(
     )
 
 
+# Purpose: Serialize user for the authentication workflow.
 def serialize_user(user: User) -> CurrentUserResponse:
     return CurrentUserResponse(
         user_id=str(user.id),

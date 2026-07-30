@@ -1,3 +1,5 @@
+# Module purpose: Define trusted instructions for the AI agent.
+
 DEBUGGER_AGENT_NAME = "RepoPilot Debugger"
 
 DEBUGGER_INSTRUCTIONS = """

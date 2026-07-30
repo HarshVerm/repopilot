@@ -149,6 +149,7 @@ class FakeCoderRunner:
     ) -> None:
         self.scenario = scenario
         self.invocations = 0
+        self.inputs: list[str] = []
 
     async def run(
         self,
@@ -158,6 +159,7 @@ class FakeCoderRunner:
         trace_metadata: dict[str, str],
     ) -> CoderRunResult:
         self.invocations += 1
+        self.inputs.append(coder_input)
         output = self.scenario(
             editor
         )

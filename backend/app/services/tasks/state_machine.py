@@ -1,3 +1,5 @@
+# Module purpose: Implement state machine behavior for the task lifecycle domain.
+
 from app.db.models.task import TASK_STATUSES
 
 
@@ -229,15 +231,19 @@ STATE_ORDER = {
 }
 
 
+# Purpose: Signal task transition failures.
 class TaskTransitionError(ValueError):
     pass
 
 
+# Purpose: Signal task concurrency failures.
 class TaskConcurrencyError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate task state machine behavior for the task lifecycle domain.
 class TaskStateMachine:
+    # Purpose: Validate transition for the task lifecycle workflow.
     def validate_transition(
         self,
         *,
@@ -265,6 +271,7 @@ class TaskStateMachine:
                 f"Invalid task transition: {current_status} -> {new_status}"
             )
 
+    # Purpose: Validate reconciliation for the task lifecycle workflow.
     def validate_reconciliation(
         self,
         *,
@@ -304,6 +311,7 @@ class TaskStateMachine:
                 f"Cannot reconcile task backwards: {current_status} -> {new_status}"
             )
 
+    # Purpose: Handle step for status for the task lifecycle workflow.
     def step_for_status(
         self,
         status: str,

@@ -1,3 +1,5 @@
+# Module purpose: Define persistent debug attempt database models.
+
 import uuid
 from datetime import datetime
 
@@ -22,6 +24,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist debug attempt records.
 class DebugAttempt(Base):
     __tablename__ = "debug_attempts"
 

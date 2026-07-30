@@ -1,3 +1,5 @@
+# Module purpose: Implement agent behavior for the AI agent domain.
+
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -28,6 +30,7 @@ from app.services.planning.agent import (
 )
 
 
+# Purpose: Represent coder run result data.
 @dataclass(frozen=True)
 class CoderRunResult:
     output: CoderOutput
@@ -40,9 +43,11 @@ class CoderRunResult:
     patch_operations_rejected: int
 
 
+# Purpose: Define the interface required from coder runner implementations.
 class CoderRunner(Protocol):
     model: str
 
+    # Purpose: Run AI agent for the AI agent workflow.
     async def run(
         self,
         coder_input: str,
@@ -53,6 +58,7 @@ class CoderRunner(Protocol):
         ...
 
 
+# Purpose: Create update file tool for the AI agent workflow.
 def create_update_file_tool(
     editor: RepoPilotPatchEditor,
 ):
@@ -76,6 +82,7 @@ def create_update_file_tool(
     return update_file
 
 
+# Purpose: Create new file tool for the AI agent workflow.
 def create_new_file_tool(
     editor: RepoPilotPatchEditor,
 ):
@@ -100,6 +107,7 @@ def create_new_file_tool(
     return create_file
 
 
+# Purpose: Create coder agent for the AI agent workflow.
 def create_coder_agent(
     editor: RepoPilotPatchEditor,
 ) -> Agent:
@@ -123,9 +131,11 @@ def create_coder_agent(
     )
 
 
+# Purpose: Encapsulate agents coder runner behavior for the AI agent domain.
 class AgentsCoderRunner:
     model = settings.coder_model
 
+    # Purpose: Run AI agent for the AI agent workflow.
     async def run(
         self,
         coder_input: str,

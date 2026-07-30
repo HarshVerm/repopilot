@@ -1,3 +1,5 @@
+# Module purpose: Define persistent final review database models.
+
 import uuid
 from datetime import datetime
 
@@ -24,6 +26,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist final review records.
 class FinalReview(Base):
     __tablename__ = "final_reviews"
 

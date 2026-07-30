@@ -1,6 +1,9 @@
+# Module purpose: Define validated github API payload schemas.
+
 from pydantic import BaseModel, Field
 
 
+# Purpose: Validate and represent repository response data.
 class RepositoryResponse(BaseModel):
     id: int
     name: str
@@ -15,6 +18,7 @@ class RepositoryResponse(BaseModel):
     disabled: bool = False
 
 
+# Purpose: Validate and represent issue response data.
 class IssueResponse(BaseModel):
     id: int
     number: int
@@ -29,6 +33,7 @@ class IssueResponse(BaseModel):
     updated_at: str | None = None
 
 
+# Purpose: Validate and represent git hub installation response data.
 class GitHubInstallationResponse(BaseModel):
     id: str
     github_installation_id: int
@@ -42,10 +47,12 @@ class GitHubInstallationResponse(BaseModel):
     repository_count: int = 0
 
 
+# Purpose: Validate and represent git hub installation list response data.
 class GitHubInstallationListResponse(BaseModel):
     installations: list[GitHubInstallationResponse]
 
 
+# Purpose: Validate and represent connected repository response data.
 class ConnectedRepositoryResponse(BaseModel):
     id: str
     installation_id: str
@@ -63,6 +70,7 @@ class ConnectedRepositoryResponse(BaseModel):
     last_synced_at: str | None
 
 
+# Purpose: Validate and represent connected repository list response data.
 class ConnectedRepositoryListResponse(BaseModel):
     repositories: list[ConnectedRepositoryResponse]
     page: int
@@ -71,6 +79,7 @@ class ConnectedRepositoryListResponse(BaseModel):
     has_next: bool
 
 
+# Purpose: Validate and represent issue list response data.
 class IssueListResponse(BaseModel):
     issues: list[IssueResponse]
     page: int

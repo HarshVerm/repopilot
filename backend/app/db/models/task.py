@@ -1,3 +1,5 @@
+# Module purpose: Define persistent task database models.
+
 import uuid
 from datetime import datetime
 
@@ -55,6 +57,7 @@ TASK_STATUSES = (
 )
 
 
+# Purpose: Persist repo pilot task records.
 class RepoPilotTask(Base):
     __tablename__ = "repo_pilot_tasks"
 
@@ -290,6 +293,7 @@ class RepoPilotTask(Base):
     )
 
 
+# Purpose: Persist task operation lock records.
 class TaskOperationLock(Base):
     __tablename__ = "task_operation_locks"
 

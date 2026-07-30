@@ -1,8 +1,11 @@
 "use client";
 
+// Module purpose: Render and coordinate the page header interface.
+
 import type { ReactNode } from "react";
 import { Search } from "lucide-react";
 
+/** Purpose: Render the page header interface. */
 export function PageHeader({
   title,
   subtitle,

@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the plan review interface.
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -21,6 +23,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 
+/** Purpose: Render the plan review interface. */
 export function PlanReview({ task }: { task: TaskResponse }) {
   const queryClient = useQueryClient();
   const [confirmReject, setConfirmReject] = useState(false);
@@ -33,6 +36,7 @@ export function PlanReview({ task }: { task: TaskResponse }) {
     enabled: Boolean(task.active_plan_id),
   });
 
+  /** Purpose: Invalidate module state for this frontend workflow. */
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.task(task.task_id) }),
@@ -266,6 +270,7 @@ export function PlanReview({ task }: { task: TaskResponse }) {
   );
 }
 
+/** Purpose: Render the list interface. */
 function List({
   title,
   items,

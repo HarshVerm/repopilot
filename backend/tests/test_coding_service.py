@@ -281,6 +281,190 @@ def test_approved_plan_can_create_a_scoped_new_file(
     asyncio.run(run_test())
 
 
+def test_revision_can_update_file_created_by_reviewed_change_set(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    create_coding_fixture_repo(repo)
+
+    def create_file_scenario(editor):
+        editor.create_file(
+            path="test.txt",
+            content="First reviewed version\n",
+        )
+        return CoderOutput(
+            summary="Created the approved test file.",
+            files_changed=[
+                FileChange(
+                    path="test.txt",
+                    change_type="create",
+                    summary="Create the test fixture.",
+                )
+            ],
+        )
+
+    def revise_file_scenario(editor):
+        editor.update_file(
+            path="test.txt",
+            content="Revised after human feedback\n",
+        )
+        return CoderOutput(
+            summary="Updated the reviewed test file.",
+            files_changed=[
+                FileChange(
+                    path="test.txt",
+                    change_type="update",
+                    summary="Apply final review feedback.",
+                )
+            ],
+        )
+
+    async def run_test():
+        plan = await seed_plan(
+            workspace_id=workspace_id,
+            files_to_modify=[],
+            files_to_create=["test.txt"],
+        )
+        revision_runner = FakeCoderRunner(
+            revise_file_scenario
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                db_plan = await db.get(
+                    ExecutionPlan,
+                    plan.id,
+                )
+                first_change_set = await CodingService(
+                    coder_runner=FakeCoderRunner(
+                        create_file_scenario
+                    )
+                ).implement_plan(
+                    plan=db_plan,
+                    repository_path=repo,
+                    issue=ISSUE,
+                    context_pack=CONTEXT_PACK,
+                    db=db,
+                )
+
+                revised_change_set = await CodingService(
+                    coder_runner=revision_runner
+                ).implement_plan(
+                    plan=db_plan,
+                    repository_path=repo,
+                    issue=ISSUE,
+                    context_pack=CONTEXT_PACK,
+                    db=db,
+                    previous_change_set_id=(
+                        first_change_set.id
+                    ),
+                    review_feedback=(
+                        "Replace the placeholder with the reviewed wording."
+                    ),
+                )
+
+                assert revised_change_set.status == "generated"
+                assert (
+                    revised_change_set.parent_change_set_id
+                    == first_change_set.id
+                )
+                assert revised_change_set.files_changed == 1
+                assert revised_change_set.files[0].path == "test.txt"
+                assert (
+                    "Mandatory Final Review Feedback "
+                    "(trusted human decision):"
+                    in revision_runner.inputs[0]
+                )
+                assert (
+                    "Replace the placeholder with the reviewed wording."
+                    in revision_runner.inputs[0]
+                )
+
+            assert (
+                repo / "test.txt"
+            ).read_text(
+                encoding="utf-8"
+            ) == "Revised after human feedback\n"
+            assert "?? test.txt" in git_status(repo)
+        finally:
+            await cleanup_plan(plan.id)
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
+def test_revision_with_unchanged_diff_requires_plan_revision(
+    tmp_path: Path,
+):
+    workspace_id = str(uuid.uuid4())
+    repo = tmp_path / "repo"
+    create_coding_fixture_repo(repo)
+
+    def no_change_scenario(editor):
+        return CoderOutput(
+            summary="The prior diff already addresses the feedback.",
+        )
+
+    async def run_test():
+        plan = await seed_plan(
+            workspace_id=workspace_id
+        )
+
+        try:
+            async with AsyncSessionLocal() as db:
+                db_plan = await db.get(
+                    ExecutionPlan,
+                    plan.id,
+                )
+                first_change_set = await CodingService(
+                    coder_runner=FakeCoderRunner(
+                        successful_searchbox_scenario
+                    )
+                ).implement_plan(
+                    plan=db_plan,
+                    repository_path=repo,
+                    issue=ISSUE,
+                    context_pack=CONTEXT_PACK,
+                    db=db,
+                )
+
+                revised_change_set = await CodingService(
+                    coder_runner=FakeCoderRunner(
+                        no_change_scenario
+                    )
+                ).implement_plan(
+                    plan=db_plan,
+                    repository_path=repo,
+                    issue=ISSUE,
+                    context_pack=CONTEXT_PACK,
+                    db=db,
+                    previous_change_set_id=(
+                        first_change_set.id
+                    ),
+                    review_feedback="Remove the remaining comments.",
+                )
+
+                assert revised_change_set.status == "failed"
+                assert (
+                    revised_change_set.diagnostics["reason"]
+                    == "review_feedback_not_applied"
+                )
+                assert (
+                    "produced no material diff change"
+                    in revised_change_set.revision_reason
+                )
+
+            assert "searchProducts(debouncedQuery)" in (
+                repo / "src/components/SearchBox.tsx"
+            ).read_text(encoding="utf-8")
+        finally:
+            await cleanup_plan(plan.id)
+            await dispose_database_engine()
+
+    asyncio.run(run_test())
+
+
 @pytest.mark.parametrize(
     "status",
     [

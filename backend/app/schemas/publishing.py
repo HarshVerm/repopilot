@@ -1,6 +1,9 @@
+# Module purpose: Define validated publishing API payload schemas.
+
 from pydantic import BaseModel
 
 
+# Purpose: Validate and represent publication response data.
 class PublicationResponse(BaseModel):
     publication_id: str
     review_id: str
@@ -20,6 +23,7 @@ class PublicationResponse(BaseModel):
     remote_head_sha: str | None = None
     pull_request_number: int | None = None
     pull_request_url: str | None = None
+    pull_request_author_login: str | None = None
     retry_count: int
     error_message: str | None = None
     failure_stage: str | None = None

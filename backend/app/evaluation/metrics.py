@@ -1,3 +1,5 @@
+# Module purpose: Implement metrics behavior for the evaluation domain.
+
 from collections import Counter, defaultdict
 from statistics import mean, median
 from typing import Any
@@ -7,6 +9,7 @@ from app.evaluation.models import (
 )
 
 
+# Purpose: Handle aggregate results for the evaluation workflow.
 def aggregate_results(
     results: list[EvaluationTaskResultData],
 ) -> dict[str, Any]:
@@ -151,6 +154,7 @@ def aggregate_results(
     }
 
 
+# Purpose: Handle ratio for the evaluation workflow.
 def ratio(
     numerator: int,
     denominator: int,
@@ -161,6 +165,7 @@ def ratio(
     return numerator / denominator
 
 
+# Purpose: Handle average attr for the evaluation workflow.
 def average_attr(
     results: list[EvaluationTaskResultData],
     attr: str,
@@ -186,6 +191,7 @@ def average_attr(
     )
 
 
+# Purpose: Handle patch size metrics for the evaluation workflow.
 def patch_size_metrics(
     results: list[EvaluationTaskResultData],
 ) -> dict[str, float | int]:
@@ -224,6 +230,7 @@ def patch_size_metrics(
     }
 
 
+# Purpose: Handle token metrics for the evaluation workflow.
 def token_metrics(
     results: list[EvaluationTaskResultData],
 ) -> dict[str, float | int | None]:
@@ -261,6 +268,7 @@ def token_metrics(
     }
 
 
+# Purpose: Handle cost metrics for the evaluation workflow.
 def cost_metrics(
     results: list[EvaluationTaskResultData],
 ) -> dict[str, float | None]:
@@ -299,6 +307,7 @@ def cost_metrics(
     }
 
 
+# Purpose: Handle latency metrics for the evaluation workflow.
 def latency_metrics(
     results: list[EvaluationTaskResultData],
 ) -> dict[str, float]:
@@ -322,6 +331,7 @@ def latency_metrics(
     }
 
 
+# Purpose: Handle breakdown for the evaluation workflow.
 def breakdown(
     results: list[EvaluationTaskResultData],
     attr: str,
@@ -363,6 +373,7 @@ def breakdown(
     }
 
 
+# Purpose: Handle p95 for the evaluation workflow.
 def p95(
     values: list[int],
 ) -> float:

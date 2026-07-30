@@ -1,3 +1,5 @@
+// Module purpose: Render and coordinate the status badge interface.
+
 import { AlertCircle, CheckCircle2, Clock, Loader2, MinusCircle } from "lucide-react";
 import { formatStatus } from "@/lib/formatters";
 import { taskStatusTone } from "@/lib/task-status";
@@ -10,6 +12,7 @@ const toneClass = {
   neutral: "border-zinc-700 bg-zinc-800/70 text-zinc-300",
 };
 
+/** Purpose: Render the status icon interface. */
 function StatusIcon({ tone }: { tone: keyof typeof toneClass }) {
   if (tone === "success") return <CheckCircle2 className="h-3.5 w-3.5" />;
   if (tone === "active") return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
@@ -18,6 +21,7 @@ function StatusIcon({ tone }: { tone: keyof typeof toneClass }) {
   return <MinusCircle className="h-3.5 w-3.5" />;
 }
 
+/** Purpose: Render the status badge interface. */
 export function StatusBadge({
   status,
   label,

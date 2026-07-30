@@ -1,3 +1,5 @@
+"""Split source text into overlapping, line-aware token-budget windows."""
+
 from dataclasses import dataclass
 from functools import lru_cache
 import re
@@ -7,6 +9,8 @@ import tiktoken
 
 @dataclass(frozen=True)
 class TokenSplit:
+    """Hold one text window and its one-based source line range."""
+
     content: str
     start_line: int
     end_line: int
@@ -14,6 +18,7 @@ class TokenSplit:
 
 @lru_cache(maxsize=1)
 def get_encoding():
+    """Return the primary tokenizer, falling back to a deterministic lexer."""
     try:
         return tiktoken.get_encoding(
             "cl100k_base"
@@ -23,10 +28,13 @@ def get_encoding():
 
 
 class SimpleEncoding:
+    """Provide a small reversible tokenizer when tiktoken is unavailable."""
+
     def encode(
         self,
         text: str,
     ) -> list[str]:
+        """Tokenize text into whitespace, identifiers, numbers, and symbols."""
         return re.findall(
             r"\s+|[A-Za-z_][A-Za-z0-9_]*|\d+|[^\s]",
             text,
@@ -36,12 +44,14 @@ class SimpleEncoding:
         self,
         tokens: list[str],
     ) -> str:
+        """Reassemble fallback tokens without changing their source text."""
         return "".join(tokens)
 
 
 def count_tokens(
     text: str,
 ) -> int:
+    """Count tokens with the same encoding used by the chunking pipeline."""
     if not text:
         return 0
 
@@ -56,6 +66,7 @@ def split_long_line(
     max_tokens: int,
     overlap_tokens: int,
 ) -> list[TokenSplit]:
+    """Window a single oversized line while preserving its line number."""
     encoding = get_encoding()
     tokens = encoding.encode(line)
     step = max(
@@ -95,6 +106,7 @@ def select_overlap_lines(
     lines: list[tuple[int, str, int]],
     overlap_tokens: int,
 ) -> list[tuple[int, str, int]]:
+    """Select trailing whole lines to carry into the next text window."""
     if overlap_tokens <= 0:
         return []
 
@@ -119,6 +131,7 @@ def split_text_by_token_budget(
     overlap_tokens: int = 0,
     start_line: int = 1,
 ) -> list[TokenSplit]:
+    """Create bounded chunks with overlap and accurate source line ranges."""
     if max_tokens <= 0:
         raise ValueError(
             "max_tokens must be greater than zero"
@@ -141,6 +154,7 @@ def split_text_by_token_budget(
     current: list[tuple[int, str, int]] = []
     current_tokens = 0
 
+    # Purpose: Handle flush current for the code chunking workflow.
     def flush_current() -> None:
         nonlocal current
         nonlocal current_tokens

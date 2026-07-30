@@ -1,3 +1,5 @@
+# Module purpose: Expose the evaluation package.
+
 from app.evaluation.dataset import (
     EvaluationSuite,
     load_evaluation_suite,

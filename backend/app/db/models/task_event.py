@@ -1,3 +1,5 @@
+# Module purpose: Define persistent task event database models.
+
 import uuid
 from datetime import datetime
 
@@ -21,6 +23,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist task event records.
 class TaskEvent(Base):
     __tablename__ = "task_events"
 

@@ -125,6 +125,50 @@ def test_publish_success_includes_approved_new_file():
     )
 
 
+def test_pull_request_uses_user_credentials_for_attribution():
+    workspace = prepare_publishing_workspace(
+        new_file=True
+    )
+    github = FakeGitHubPublisher()
+    service = publication_service(
+        github=github
+    )
+    user_credentials = GitHubCredentials(
+        username="x-access-token",
+        token="github-user-access-token",
+    )
+
+    async def run_test():
+        try:
+            async with AsyncSessionLocal() as db:
+                publication = await service.publish_review(
+                    review_id=workspace.review.id,
+                    repository_path=workspace.repo,
+                    db=db,
+                    pull_request_credentials=(
+                        user_credentials
+                    ),
+                    pull_request_actor_login="octocat",
+                )
+
+            assert publication.status == PUBLISHED
+            assert (
+                publication.pull_request_author_login
+                == "octocat"
+            )
+            assert len(github.created_requests) == 1
+            assert (
+                github.created_requests[0]["credentials"]
+                == user_credentials
+            )
+        finally:
+            await cleanup_publishing_workspace(
+                workspace
+            )
+
+    asyncio.run(run_test())
+
+
 def test_failed_publication_can_retry_same_approved_task():
     workspace = prepare_publishing_workspace(
         new_file=True

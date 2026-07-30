@@ -1,3 +1,5 @@
+# Module purpose: Implement fingerprint behavior for the debugging domain.
+
 import re
 
 from app.db.models.execution_run import (
@@ -24,6 +26,7 @@ IMPORTANT_MARKERS = (
 )
 
 
+# Purpose: Handle failure fingerprint for the debugging workflow.
 def failure_fingerprint(
     *,
     execution_run: ExecutionRun,
@@ -46,6 +49,7 @@ def failure_fingerprint(
     return sha256_text(text)
 
 
+# Purpose: Normalize failure text for the debugging workflow.
 def normalize_failure_text(
     text: str,
 ) -> str:
@@ -78,6 +82,7 @@ def normalize_failure_text(
     )
 
 
+# Purpose: Normalize line for the debugging workflow.
 def normalize_line(
     line: str,
 ) -> str:

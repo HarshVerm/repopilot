@@ -1,5 +1,8 @@
+// Module purpose: Render and coordinate the empty state interface.
+
 import { Inbox } from "lucide-react";
 
+/** Purpose: Render the empty state interface. */
 export function EmptyState({
   title,
   detail,

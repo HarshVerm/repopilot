@@ -1,3 +1,5 @@
+# Module purpose: Define validated retrieval API payload schemas.
+
 from typing import Any
 
 from pydantic import (
@@ -6,11 +8,13 @@ from pydantic import (
 )
 
 
+# Purpose: Validate and represent retrieval build failure data.
 class RetrievalBuildFailure(BaseModel):
     file_path: str
     reason: str
 
 
+# Purpose: Validate and represent retrieval build response data.
 class RetrievalBuildResponse(BaseModel):
     workspace_id: str
     files_processed: int
@@ -21,6 +25,7 @@ class RetrievalBuildResponse(BaseModel):
     failures: list[RetrievalBuildFailure]
 
 
+# Purpose: Validate and represent retrieval search request data.
 class RetrievalSearchRequest(BaseModel):
     query: str = Field(
         min_length=1,
@@ -34,6 +39,7 @@ class RetrievalSearchRequest(BaseModel):
     debug: bool = False
 
 
+# Purpose: Validate and represent retrieval search result data.
 class RetrievalSearchResult(BaseModel):
     chunk_id: str
     file_path: str
@@ -46,6 +52,7 @@ class RetrievalSearchResult(BaseModel):
     matched_by: list[str]
 
 
+# Purpose: Validate and represent context chunk data.
 class ContextChunk(BaseModel):
     chunk_id: str
     symbol: str | None
@@ -57,17 +64,20 @@ class ContextChunk(BaseModel):
     matched_by: list[str]
 
 
+# Purpose: Validate and represent context file data.
 class ContextFile(BaseModel):
     path: str
     chunks: list[ContextChunk]
 
 
+# Purpose: Validate and represent context pack data.
 class ContextPack(BaseModel):
     query: str
     estimated_tokens: int
     files: list[ContextFile]
 
 
+# Purpose: Validate and represent retrieval search response data.
 class RetrievalSearchResponse(BaseModel):
     query: str
     results: list[RetrievalSearchResult]

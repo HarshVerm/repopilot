@@ -1,13 +1,17 @@
+# Module purpose: Implement workspace behavior for the repository workspace domain.
+
 import configparser
 from pathlib import Path
 
 
+# Purpose: Normalize repo token for the repository workspace workflow.
 def normalize_repo_token(
     value: str,
 ) -> str:
     return value.strip().lower()
 
 
+# Purpose: Parse origin owner repo for the repository workspace workflow.
 def parse_origin_owner_repo(
     repository_path: Path,
 ) -> tuple[str, str] | None:
@@ -52,6 +56,7 @@ def parse_origin_owner_repo(
     )
 
 
+# Purpose: Handle workspace matches repository for the repository workspace workflow.
 def workspace_matches_repository(
     *,
     repository_path: Path,

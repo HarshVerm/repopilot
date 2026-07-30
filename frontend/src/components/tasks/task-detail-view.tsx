@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task detail view interface.
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { notFound, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -23,6 +25,7 @@ import { TaskDetailHeader } from "./task-detail-header";
 import { TaskOverview } from "./task-overview";
 import { TaskTabs, normalizeTaskTab } from "./task-tabs";
 
+/** Purpose: Render the task detail view interface. */
 export function TaskDetailView({ taskId }: { taskId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,6 +67,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   const publication = publicationByIdQuery.data ?? reviewPublicationQuery.data ?? null;
 
+  /** Purpose: Set tab for this frontend workflow. */
   const setTab = (tab: TaskTab) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
@@ -71,6 +75,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   };
 
   const refreshing = taskQuery.isFetching;
+  /** Purpose: Handle refresh for this frontend module. */
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.task(taskId) }),
@@ -152,6 +157,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   );
 }
 
+/** Purpose: Handle task issue for this frontend module. */
 function taskIssue(task: TaskResponse): IssueResponse | undefined {
   if (!task.issue) return undefined;
   return {

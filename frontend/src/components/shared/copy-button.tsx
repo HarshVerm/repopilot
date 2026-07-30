@@ -1,8 +1,11 @@
 "use client";
 
+// Module purpose: Render and coordinate the copy button interface.
+
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
+/** Purpose: Render the copy button interface. */
 export function CopyButton({
   value,
   label = "Copy",
@@ -13,6 +16,7 @@ export function CopyButton({
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  /** Purpose: Copy module state for this frontend workflow. */
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);

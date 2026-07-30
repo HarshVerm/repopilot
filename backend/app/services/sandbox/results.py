@@ -1,3 +1,5 @@
+# Module purpose: Implement results behavior for the sandbox execution domain.
+
 from dataclasses import asdict, dataclass
 
 from app.core.config import settings
@@ -32,6 +34,7 @@ VERIFICATION_COMMAND_TYPES = {
 }
 
 
+# Purpose: Encapsulate execution command behavior for the sandbox execution domain.
 @dataclass(frozen=True)
 class ExecutionCommand:
     name: str
@@ -43,10 +46,12 @@ class ExecutionCommand:
     network_enabled: bool = False
     runtime: str = "node"
 
+    # Purpose: Handle to json for the sandbox execution workflow.
     def to_json(self) -> dict:
         return asdict(self)
 
 
+# Purpose: Represent command result data.
 @dataclass(frozen=True)
 class CommandResult:
     name: str
@@ -59,10 +64,12 @@ class CommandResult:
     stdout_truncated: bool = False
     stderr_truncated: bool = False
 
+    # Purpose: Handle to json for the sandbox execution workflow.
     def to_json(self) -> dict:
         return asdict(self)
 
 
+# Purpose: Handle skipped result for the sandbox execution workflow.
 def skipped_result(
     *,
     name: str,
@@ -80,6 +87,7 @@ def skipped_result(
     )
 
 
+# Purpose: Handle truncate bytes for the sandbox execution workflow.
 def truncate_bytes(
     content: bytes | None,
     *,
@@ -104,6 +112,7 @@ def truncate_bytes(
     )
 
 
+# Purpose: Handle command result from exit for the sandbox execution workflow.
 def command_result_from_exit(
     *,
     command: ExecutionCommand,
@@ -138,6 +147,7 @@ def command_result_from_exit(
     )
 
 
+# Purpose: Handle timeout result for the sandbox execution workflow.
 def timeout_result(
     *,
     command: ExecutionCommand,
@@ -167,6 +177,7 @@ def timeout_result(
     )
 
 
+# Purpose: Handle error result for the sandbox execution workflow.
 def error_result(
     *,
     command: ExecutionCommand,
@@ -183,6 +194,7 @@ def error_result(
     )
 
 
+# Purpose: Handle overall status for the sandbox execution workflow.
 def overall_status(
     results: list[CommandResult],
 ) -> str:
@@ -234,6 +246,7 @@ def overall_status(
     return EXECUTION_PASSED
 
 
+# Purpose: Check statuses for the sandbox execution workflow.
 def check_statuses(
     results: list[CommandResult],
 ) -> dict[str, str]:
@@ -272,6 +285,7 @@ def check_statuses(
     return checks
 
 
+# Purpose: Handle merge status for the sandbox execution workflow.
 def merge_status(
     current: str,
     incoming: str,

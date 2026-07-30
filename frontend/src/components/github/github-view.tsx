@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the github view interface.
+
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ExternalLink, GitBranch, GitPullRequest } from "lucide-react";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -13,12 +15,14 @@ import { formatDateTime, repositoryFullName } from "@/lib/formatters";
 import { queryKeys } from "@/lib/query-client";
 import type { PublicationResponse } from "@/types/api";
 
+/** Purpose: Check whether pull request for this frontend workflow. */
 function hasPullRequest(
   publication: PublicationResponse | undefined,
 ): publication is PublicationResponse {
   return Boolean(publication?.pull_request_url);
 }
 
+/** Purpose: Render the git hub view interface. */
 export function GitHubView() {
   const tasksQuery = useQuery({
     queryKey: queryKeys.tasks,

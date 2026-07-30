@@ -1,3 +1,5 @@
+# Module purpose: Define environment-backed application configuration.
+
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
@@ -9,6 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
+# Purpose: Encapsulate settings behavior for the application configuration domain.
 class Settings(BaseSettings):
     app_name: str = "RepoPilot"
     app_env: str = "development"
@@ -21,6 +24,7 @@ class Settings(BaseSettings):
     github_app_client_id: str | None = None
     github_app_client_secret: str | None = None
     github_app_slug: str | None = None
+    github_user_token_encryption_secret: str | None = None
     openai_api_key: str | None = None
 
     app_base_url: str = "http://localhost:8000"
@@ -135,6 +139,7 @@ class Settings(BaseSettings):
     enable_sensitive_agent_tracing: bool = False
     readiness_check_timeout_seconds: float = 2.0
 
+    # Purpose: Validate embedding dimensions for the application configuration workflow.
     @field_validator("embedding_dimensions")
     @classmethod
     def validate_embedding_dimensions(
@@ -149,6 +154,7 @@ class Settings(BaseSettings):
 
         return value
 
+    # Purpose: Validate settings for the application configuration workflow.
     @model_validator(mode="after")
     def validate_settings(
         self,
@@ -286,6 +292,17 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "SESSION_SECRET must be at least 32 characters in production"
                 )
+            if (
+                not self.github_user_token_encryption_secret
+                or len(
+                    self.github_user_token_encryption_secret
+                )
+                < 32
+            ):
+                raise ValueError(
+                    "GITHUB_USER_TOKEN_ENCRYPTION_SECRET must be at least "
+                    "32 characters in production"
+                )
             app_host = urlparse(self.app_base_url).hostname
             frontend_host = urlparse(self.frontend_url).hostname
             if (
@@ -308,6 +325,7 @@ class Settings(BaseSettings):
     )
 
 
+# Purpose: Return settings for the application configuration workflow.
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

@@ -1,3 +1,5 @@
+# Module purpose: Implement failure classifier behavior for the debugging domain.
+
 from dataclasses import dataclass
 
 from app.db.models.execution_run import (
@@ -35,6 +37,7 @@ ELIGIBLE_FAILURES = {
 }
 
 
+# Purpose: Encapsulate failure classification behavior for the debugging domain.
 @dataclass(frozen=True)
 class FailureClassification:
     category: str
@@ -43,6 +46,7 @@ class FailureClassification:
     failed_result: dict | None
 
 
+# Purpose: Classify execution run for the debugging workflow.
 def classify_execution_run(
     execution_run: ExecutionRun,
 ) -> FailureClassification:
@@ -145,6 +149,7 @@ def classify_execution_run(
     )
 
 
+# Purpose: Handle first result with status for the debugging workflow.
 def first_result_with_status(
     results: list[dict],
     status: str,
@@ -159,6 +164,7 @@ def first_result_with_status(
     )
 
 
+# Purpose: Handle first failed command type for the debugging workflow.
 def first_failed_command_type(
     results: list[dict],
     command_type: str,
@@ -174,6 +180,7 @@ def first_failed_command_type(
     )
 
 
+# Purpose: Classify error result for the debugging workflow.
 def classify_error_result(
     execution_run: ExecutionRun,
     result: dict | None,

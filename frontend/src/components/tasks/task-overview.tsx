@@ -1,3 +1,5 @@
+// Module purpose: Render and coordinate the task overview interface.
+
 import { Box, Bug, ClipboardCheck, Code, FileText, Info, PenTool } from "lucide-react";
 import type { ReactNode } from "react";
 import type { IssueResponse, PlanResponse, PublicationResponse, TaskResponse } from "@/types/api";
@@ -6,6 +8,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDuration, formatNumber, metricValue, repositoryFullName } from "@/lib/formatters";
 import { isActiveTask } from "@/lib/task-status";
 
+/** Purpose: Render the task overview interface. */
 export function TaskOverview({
   task,
   issue,
@@ -178,6 +181,7 @@ export function TaskOverview({
   );
 }
 
+/** Purpose: Render the artifact interface. */
 function Artifact({
   label,
   value,
@@ -200,6 +204,7 @@ function Artifact({
   );
 }
 
+/** Purpose: Render the info pair interface. */
 function InfoPair({
   label,
   value,

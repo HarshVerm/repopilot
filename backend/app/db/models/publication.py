@@ -1,3 +1,5 @@
+# Module purpose: Define persistent publication database models.
+
 import uuid
 from datetime import datetime
 
@@ -22,6 +24,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist publication records.
 class Publication(Base):
     __tablename__ = "publications"
 
@@ -162,6 +165,10 @@ class Publication(Base):
 
     pull_request_url: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
+    )
+    pull_request_author_login: Mapped[str | None] = mapped_column(
+        String(255),
         nullable=True,
     )
 

@@ -1,3 +1,5 @@
+# Module purpose: Implement locking behavior for the task lifecycle domain.
+
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -8,11 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.task import TaskOperationLock
 
 
+# Purpose: Encapsulate task operation conflict behavior for the task lifecycle domain.
 class TaskOperationConflict(RuntimeError):
     pass
 
 
+# Purpose: Coordinate task operation lock operations.
 class TaskOperationLockService:
+    # Purpose: Handle acquire for the task lifecycle workflow.
     async def acquire(
         self,
         *,
@@ -52,6 +57,7 @@ class TaskOperationLockService:
         await db.refresh(lock)
         return lock
 
+    # Purpose: Release task lifecycle for the task lifecycle workflow.
     async def release(
         self,
         *,

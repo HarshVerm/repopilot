@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the planning domain.
+
 import re
 import uuid
 from pathlib import Path
@@ -48,10 +50,12 @@ from app.services.tasks.state_machine import (
 )
 
 
+# Purpose: Signal planning failures.
 class PlanningError(RuntimeError):
     pass
 
 
+# Purpose: Signal plan state failures.
 class PlanStateError(ValueError):
     pass
 
@@ -168,6 +172,7 @@ def apply_safe_planning_defaults(
     return normalized
 
 
+# Purpose: Handle planner failure message for the planning workflow.
 def planner_failure_message(
     error: Exception,
 ) -> str:
@@ -190,6 +195,7 @@ def planner_failure_message(
     )
 
 
+# Purpose: Issue query text for the planning workflow.
 def issue_query_text(
     issue: dict,
 ) -> str:
@@ -199,6 +205,7 @@ def issue_query_text(
     ).strip()
 
 
+# Purpose: Serialize plan for the planning workflow.
 def serialize_plan(
     plan: ExecutionPlan,
 ) -> dict:
@@ -224,7 +231,9 @@ def serialize_plan(
     }
 
 
+# Purpose: Coordinate planner operations.
 class PlannerService:
+    # Purpose: Initialize planner service state and dependencies.
     def __init__(
         self,
         *,
@@ -235,6 +244,7 @@ class PlannerService:
             or AgentsPlannerRunner()
         )
 
+    # Purpose: Create plan for the planning workflow.
     async def create_plan(
         self,
         *,
@@ -559,6 +569,7 @@ class PlannerService:
 
         return plan
 
+    # Purpose: Return plan for the planning workflow.
     async def get_plan(
         self,
         *,
@@ -570,6 +581,7 @@ class PlannerService:
             plan_id,
         )
 
+    # Purpose: Approve plan for the planning workflow.
     async def approve_plan(
         self,
         *,
@@ -617,6 +629,7 @@ class PlannerService:
 
         return plan
 
+    # Purpose: Reject plan for the planning workflow.
     async def reject_plan(
         self,
         *,

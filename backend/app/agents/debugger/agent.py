@@ -1,3 +1,5 @@
+# Module purpose: Implement agent behavior for the AI agent domain.
+
 import time
 from dataclasses import dataclass
 from typing import Protocol
@@ -32,6 +34,7 @@ from app.services.planning.agent import (
 )
 
 
+# Purpose: Represent debugger run result data.
 @dataclass(frozen=True)
 class DebuggerRunResult:
     output: DebuggerOutput
@@ -44,9 +47,11 @@ class DebuggerRunResult:
     patch_operations_rejected: int
 
 
+# Purpose: Define the interface required from debugger runner implementations.
 class DebuggerRunner(Protocol):
     model: str
 
+    # Purpose: Run AI agent for the AI agent workflow.
     async def run(
         self,
         debugger_input: str,
@@ -57,6 +62,7 @@ class DebuggerRunner(Protocol):
         ...
 
 
+# Purpose: Create debugger agent for the AI agent workflow.
 def create_debugger_agent(
     editor: RepoPilotPatchEditor,
 ) -> Agent:
@@ -77,9 +83,11 @@ def create_debugger_agent(
     )
 
 
+# Purpose: Encapsulate agents debugger runner behavior for the AI agent domain.
 class AgentsDebuggerRunner:
     model = settings.debugger_model
 
+    # Purpose: Run AI agent for the AI agent workflow.
     async def run(
         self,
         debugger_input: str,

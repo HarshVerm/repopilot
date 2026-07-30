@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task detail header interface.
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Folder, RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +20,7 @@ import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TaskLifecycle } from "./task-lifecycle";
 
+/** Purpose: Render the task detail header interface. */
 export function TaskDetailHeader({
   task,
   issue,
@@ -95,6 +98,7 @@ export function TaskDetailHeader({
     },
   });
 
+  /** Purpose: Handle run action for this frontend module. */
   function runAction(actionId: string) {
     if (actionId === "review_plan") onTabChange("plan");
     if (actionId === "review_final_diff") onTabChange("changes");

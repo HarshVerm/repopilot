@@ -1,3 +1,5 @@
+# Module purpose: Implement workspace behavior for the repository workspace domain.
+
 import shutil
 from pathlib import Path
 
@@ -13,11 +15,14 @@ from app.services.tasks.state_machine import (
 )
 
 
+# Purpose: Signal cleanup safety failures.
 class CleanupSafetyError(ValueError):
     pass
 
 
+# Purpose: Coordinate workspace cleanup operations.
 class WorkspaceCleanupService:
+    # Purpose: Initialize workspace cleanup service state and dependencies.
     def __init__(
         self,
         *,
@@ -31,6 +36,7 @@ class WorkspaceCleanupService:
             task_service or TaskService()
         )
 
+    # Purpose: Clean up task workspace for the repository workspace workflow.
     async def cleanup_task_workspace(
         self,
         *,
@@ -77,6 +83,7 @@ class WorkspaceCleanupService:
             "removed": existed,
         }
 
+    # Purpose: Handle safe workspace path for the repository workspace workflow.
     def safe_workspace_path(
         self,
         workspace_id: str,

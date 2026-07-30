@@ -1,3 +1,5 @@
+# Module purpose: Implement validation behavior for the planning domain.
+
 from pathlib import Path
 
 from sqlalchemy import select
@@ -20,10 +22,12 @@ from app.services.changes.policy import (
 )
 
 
+# Purpose: Signal plan validation failures.
 class PlanValidationError(ValueError):
     pass
 
 
+# Purpose: Validate relative plan path for the planning workflow.
 def validate_relative_plan_path(
     path: str,
 ) -> None:
@@ -39,6 +43,7 @@ def validate_relative_plan_path(
         )
 
 
+# Purpose: Load workspace file paths for the planning workflow.
 async def load_workspace_file_paths(
     db: AsyncSession,
     *,
@@ -57,6 +62,7 @@ async def load_workspace_file_paths(
     }
 
 
+# Purpose: Count file lines for the planning workflow.
 def count_file_lines(
     repository_path: Path,
     file_path: str,
@@ -82,6 +88,7 @@ def count_file_lines(
     )
 
 
+# Purpose: Validate file exists for the planning workflow.
 def validate_file_exists(
     path: str,
     existing_paths: set[str],
@@ -94,6 +101,7 @@ def validate_file_exists(
         )
 
 
+# Purpose: Validate source reference for the planning workflow.
 def validate_source_reference(
     reference: SourceReference,
     *,
@@ -148,6 +156,7 @@ def validate_source_reference(
             )
 
 
+# Purpose: Validate planned file for the planning workflow.
 def validate_planned_file(
     planned_file: PlannedFile,
     *,
@@ -167,6 +176,7 @@ def validate_planned_file(
         )
 
 
+# Purpose: Validate planned modification for the planning workflow.
 def validate_planned_modification(
     planned_file: PlannedFile,
     *,
@@ -212,6 +222,7 @@ def validate_planned_modification(
         ) from exc
 
 
+# Purpose: Validate implementation step for the planning workflow.
 def validate_implementation_step(
     step: ImplementationStep,
     *,
@@ -224,6 +235,7 @@ def validate_implementation_step(
         )
 
 
+# Purpose: Validate planner output for the planning workflow.
 async def validate_planner_output(
     *,
     output: PlannerOutput,

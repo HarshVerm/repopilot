@@ -1,13 +1,18 @@
+# Module purpose: Implement pricing behavior for the observability domain.
+
 from dataclasses import dataclass
 
 
+# Purpose: Encapsulate model price behavior for the observability domain.
 @dataclass(frozen=True)
 class ModelPrice:
     input_per_million: float
     output_per_million: float
 
 
+# Purpose: Coordinate model pricing operations.
 class ModelPricingService:
+    # Purpose: Initialize model pricing service state and dependencies.
     def __init__(
         self,
         *,
@@ -15,6 +20,7 @@ class ModelPricingService:
     ) -> None:
         self.prices = prices or {}
 
+    # Purpose: Handle estimate cost usd for the observability workflow.
     def estimate_cost_usd(
         self,
         *,

@@ -1,3 +1,5 @@
+# Module purpose: Implement permissions behavior for the GitHub integration domain.
+
 from collections.abc import Mapping
 
 
@@ -7,6 +9,7 @@ REQUIRED_PUBLICATION_PERMISSIONS = {
 }
 
 
+# Purpose: Normalize app permissions for the GitHub integration workflow.
 def normalize_app_permissions(
     permissions: Mapping | None,
 ) -> dict[str, str]:
@@ -17,6 +20,7 @@ def normalize_app_permissions(
     }
 
 
+# Purpose: Handle missing publication permissions for the GitHub integration workflow.
 def missing_publication_permissions(
     permissions: Mapping | None,
 ) -> list[str]:
@@ -31,6 +35,7 @@ def missing_publication_permissions(
     ]
 
 
+# Purpose: Handle repository capabilities from app permissions for the GitHub integration workflow.
 def repository_capabilities_from_app_permissions(
     permissions: Mapping | None,
 ) -> dict[str, bool]:

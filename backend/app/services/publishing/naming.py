@@ -1,6 +1,9 @@
+# Module purpose: Implement naming behavior for the publication domain.
+
 import re
 
 
+# Purpose: Signal branch name failures.
 class BranchNameError(ValueError):
     pass
 
@@ -8,6 +11,7 @@ class BranchNameError(ValueError):
 MAX_BRANCH_LENGTH = 96
 
 
+# Purpose: Generate branch name for the publication workflow.
 def generate_branch_name(
     *,
     issue_number: int,
@@ -27,6 +31,7 @@ def generate_branch_name(
     )
 
 
+# Purpose: Handle collision branch name for the publication workflow.
 def collision_branch_name(
     *,
     base_branch_name: str,
@@ -39,6 +44,7 @@ def collision_branch_name(
     )
 
 
+# Purpose: Validate branch name for the publication workflow.
 def validate_branch_name(
     branch_name: str,
     *,
@@ -83,6 +89,7 @@ def validate_branch_name(
         )
 
 
+# Purpose: Handle slugify for the publication workflow.
 def slugify(
     value: str,
 ) -> str:
@@ -96,6 +103,7 @@ def slugify(
     return cleaned[:48] or "change"
 
 
+# Purpose: Handle trim branch name for the publication workflow.
 def trim_branch_name(
     branch_name: str,
 ) -> str:

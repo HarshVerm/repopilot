@@ -1,3 +1,5 @@
+# Module purpose: Define persistent execution run database models.
+
 import uuid
 from datetime import datetime
 
@@ -23,6 +25,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist execution run records.
 class ExecutionRun(Base):
     __tablename__ = "execution_runs"
 

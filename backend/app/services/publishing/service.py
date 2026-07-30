@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the publication domain.
+
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -106,7 +108,9 @@ FAILED = "failed"
 PARTIALLY_PUBLISHED = "partially_published"
 
 
+# Purpose: Coordinate publication operations.
 class PublicationService:
+    # Purpose: Initialize publication service state and dependencies.
     def __init__(
         self,
         *,
@@ -138,6 +142,7 @@ class PublicationService:
         )
         self.github_app = github_app or github_app_client
 
+    # Purpose: Publish review for the publication workflow.
     async def publish_review(
         self,
         *,
@@ -148,6 +153,8 @@ class PublicationService:
         github_installation_id: int | None = None,
         installation_id: uuid.UUID | None = None,
         repository_id: uuid.UUID | None = None,
+        pull_request_credentials: GitHubCredentials | None = None,
+        pull_request_actor_login: str | None = None,
     ) -> Publication:
         records = await self.load_review_records(
             review_id=review_id,
@@ -356,6 +363,13 @@ class PublicationService:
                 repository_path=repository_path,
                 base_branch=repository_metadata.default_branch,
                 credentials=credentials,
+                pull_request_credentials=(
+                    pull_request_credentials
+                    or credentials
+                ),
+                pull_request_actor_login=(
+                    pull_request_actor_login
+                ),
                 git=git,
                 db=db,
             )
@@ -389,6 +403,7 @@ class PublicationService:
             publication.error_message = safe_public_error(
                 str(exc),
                 credentials,
+                pull_request_credentials,
             )
             await self.save_publication(
                 publication,
@@ -475,6 +490,7 @@ class PublicationService:
                     db=db,
                 )
 
+    # Purpose: Invalidate review approval for the publication workflow.
     async def invalidate_review_approval(
         self,
         *,
@@ -509,6 +525,7 @@ class PublicationService:
                 },
             )
 
+    # Purpose: Continue publication for the publication workflow.
     async def continue_publication(
         self,
         *,
@@ -519,6 +536,8 @@ class PublicationService:
         repository_path: Path,
         base_branch: str,
         credentials: GitHubCredentials | None,
+        pull_request_credentials: GitHubCredentials | None,
+        pull_request_actor_login: str | None,
         git: SafeGitPublisher,
         db: AsyncSession,
     ) -> Publication:
@@ -563,7 +582,10 @@ class PublicationService:
             publication=publication,
             review=review,
             plan=plan,
-            credentials=credentials,
+            credentials=pull_request_credentials,
+            pull_request_actor_login=(
+                pull_request_actor_login
+            ),
             db=db,
         )
 
@@ -577,6 +599,7 @@ class PublicationService:
 
         return publication
 
+    # Purpose: Prepare commit for the publication workflow.
     async def prepare_commit(
         self,
         *,
@@ -708,6 +731,7 @@ class PublicationService:
             db=db,
         )
 
+    # Purpose: Stage and validate for the publication workflow.
     async def stage_and_validate(
         self,
         *,
@@ -751,6 +775,7 @@ class PublicationService:
                 "Staged diff does not match approved review diff"
             )
 
+    # Purpose: Verify existing commit for the publication workflow.
     async def verify_existing_commit(
         self,
         *,
@@ -793,6 +818,7 @@ class PublicationService:
             error_type=CommitDiffMismatchError,
         )
 
+    # Purpose: Handle push publication branch for the publication workflow.
     async def push_publication_branch(
         self,
         *,
@@ -841,6 +867,7 @@ class PublicationService:
             db,
         )
 
+    # Purpose: Create or record pull request for the publication workflow.
     async def create_or_record_pull_request(
         self,
         *,
@@ -848,6 +875,7 @@ class PublicationService:
         review: FinalReview,
         plan: ExecutionPlan,
         credentials: GitHubCredentials | None,
+        pull_request_actor_login: str | None,
         db: AsyncSession,
     ) -> None:
         if (
@@ -868,6 +896,21 @@ class PublicationService:
         )
 
         if existing is None:
+            log_task_event(
+                "publication.pull_request_creating",
+                task_id=(
+                    str(publication.task_id)
+                    if publication.task_id
+                    else None
+                ),
+                publication_id=str(publication.id),
+                actor_login=pull_request_actor_login,
+                authentication=(
+                    "user_access_token"
+                    if pull_request_actor_login
+                    else "repository_credentials"
+                ),
+            )
             existing = await self.github_publisher.create_pull_request(
                 owner=plan.repository_owner,
                 repo=plan.repository_name,
@@ -890,11 +933,16 @@ class PublicationService:
             existing.number
         )
         publication.pull_request_url = existing.url
+        publication.pull_request_author_login = (
+            existing.author_login
+            or pull_request_actor_login
+        )
         publication.pr_created_at = (
             publication.pr_created_at
             or now_utc()
         )
 
+    # Purpose: Handle choose publication branch for the publication workflow.
     def choose_publication_branch(
         self,
         *,
@@ -940,6 +988,7 @@ class PublicationService:
             "Could not find an available RepoPilot branch name"
         )
 
+    # Purpose: Load review records for the publication workflow.
     async def load_review_records(
         self,
         *,
@@ -975,6 +1024,7 @@ class PublicationService:
             execution_run,
         )
 
+    # Purpose: Return publication for the publication workflow.
     async def get_publication(
         self,
         *,
@@ -986,6 +1036,7 @@ class PublicationService:
             publication_id,
         )
 
+    # Purpose: Return publication by review for the publication workflow.
     async def get_publication_by_review(
         self,
         *,
@@ -1002,6 +1053,7 @@ class PublicationService:
 
         return result.first()
 
+    # Purpose: Create publication for the publication workflow.
     async def create_publication(
         self,
         *,
@@ -1054,6 +1106,7 @@ class PublicationService:
         )
         return publication
 
+    # Purpose: Handle save publication for the publication workflow.
     async def save_publication(
         self,
         publication: Publication,
@@ -1065,6 +1118,7 @@ class PublicationService:
         )
 
 
+# Purpose: Handle generated branch name for the publication workflow.
 def generated_branch_name(
     review: FinalReview,
 ) -> str:
@@ -1082,6 +1136,7 @@ def generated_branch_name(
     )
 
 
+# Purpose: Validate existing publication for the publication workflow.
 def validate_existing_publication(
     *,
     publication: Publication,
@@ -1107,6 +1162,7 @@ def validate_existing_publication(
         )
 
 
+# Purpose: Validate published publication for the publication workflow.
 def validate_published_publication(
     publication: Publication,
 ) -> None:
@@ -1121,6 +1177,7 @@ def validate_published_publication(
         )
 
 
+# Purpose: Validate pull request head for the publication workflow.
 def validate_pull_request_head(
     *,
     pull_request: PullRequestMetadata,
@@ -1135,6 +1192,7 @@ def validate_pull_request_head(
         )
 
 
+# Purpose: Build commit subject for the publication workflow.
 def build_commit_subject(
     review: FinalReview,
 ) -> str:
@@ -1160,6 +1218,7 @@ def build_commit_subject(
     ).rstrip(" .")
 
 
+# Purpose: Build commit body for the publication workflow.
 def build_commit_body(
     review: FinalReview,
 ) -> str:
@@ -1198,6 +1257,7 @@ def build_commit_body(
     )
 
 
+# Purpose: Build pr title for the publication workflow.
 def build_pr_title(
     review: FinalReview,
 ) -> str:
@@ -1206,6 +1266,7 @@ def build_pr_title(
     )
 
 
+# Purpose: Build pr body for the publication workflow.
 def build_pr_body(
     review: FinalReview,
 ) -> str:
@@ -1266,6 +1327,7 @@ def build_pr_body(
     )
 
 
+# Purpose: Handle change label for the publication workflow.
 def change_label(
     file: dict,
 ) -> str:
@@ -1281,6 +1343,7 @@ def change_label(
     return value.capitalize()
 
 
+# Purpose: Format status for the publication workflow.
 def format_status(
     status: str | None,
 ) -> str:
@@ -1304,6 +1367,7 @@ def format_status(
     )
 
 
+# Purpose: Sanitize inline text for the publication workflow.
 def sanitize_inline_text(
     value: str,
 ) -> str:
@@ -1317,28 +1381,31 @@ def sanitize_inline_text(
     return cleaned[:300]
 
 
+# Purpose: Handle safe public error for the publication workflow.
 def safe_public_error(
     message: str,
-    credentials: GitHubCredentials | None,
+    *credentials: GitHubCredentials | None,
 ) -> str:
     return sanitize_error(
         sanitize_inline_text(
             message
         ),
-        secrets=(
-            (credentials.token,)
-            if credentials
-            else ()
+        secrets=tuple(
+            credential.token
+            for credential in credentials
+            if credential is not None
         ),
     )
 
 
+# Purpose: Handle now utc for the publication workflow.
 def now_utc() -> datetime:
     return datetime.now(
         UTC
     )
 
 
+# Purpose: Serialize publication for the publication workflow.
 def serialize_publication(
     publication: Publication,
 ) -> dict:
@@ -1390,6 +1457,9 @@ def serialize_publication(
         "pull_request_url": (
             publication.pull_request_url
         ),
+        "pull_request_author_login": (
+            publication.pull_request_author_login
+        ),
         "retry_count": publication.retry_count,
         "error_message": (
             publication.error_message
@@ -1414,6 +1484,7 @@ def serialize_publication(
     }
 
 
+# Purpose: Handle isoformat for the publication workflow.
 def isoformat(
     value,
 ) -> str | None:

@@ -1,9 +1,12 @@
+# Module purpose: Define validated mapper API payload schemas.
+
 from app.schemas.github import (
     IssueResponse,
     RepositoryResponse,
 )
 
 
+# Purpose: Map repository for the API schema workflow.
 def map_repository(data: dict) -> RepositoryResponse:
     return RepositoryResponse(
         id=data["id"],
@@ -20,6 +23,7 @@ def map_repository(data: dict) -> RepositoryResponse:
     )
 
 
+# Purpose: Map issue for the API schema workflow.
 def map_issue(data: dict) -> IssueResponse:
     return IssueResponse(
         id=data["id"],

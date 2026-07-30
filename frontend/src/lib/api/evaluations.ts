@@ -1,6 +1,9 @@
+// Module purpose: Provide typed API operations for evaluations.
+
 import type { EvaluationRunRecordResponse, EvaluationRunResponse } from "@/types/api";
 import { apiRequest } from "./client";
 
+/** Purpose: Handle run evaluation for this frontend module. */
 export function runEvaluation(body: {
   suite?: string;
   task?: string | null;
@@ -17,6 +20,7 @@ export function runEvaluation(body: {
   });
 }
 
+/** Purpose: Return evaluation run for this frontend workflow. */
 export function getEvaluationRun(evaluationRunId: string, signal?: AbortSignal) {
   return apiRequest<EvaluationRunRecordResponse>(
     `/api/v1/evaluations/${evaluationRunId}`,

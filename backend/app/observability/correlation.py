@@ -1,3 +1,5 @@
+# Module purpose: Implement correlation behavior for the observability domain.
+
 import contextvars
 import re
 import uuid
@@ -21,10 +23,12 @@ _REQUEST_ID: contextvars.ContextVar[str | None] = (
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")
 
 
+# Purpose: Generate correlation id for the observability workflow.
 def generate_correlation_id() -> str:
     return str(uuid.uuid4())
 
 
+# Purpose: Validate or generate correlation id for the observability workflow.
 def validate_or_generate_correlation_id(
     value: str | None,
 ) -> str:
@@ -34,14 +38,17 @@ def validate_or_generate_correlation_id(
     return generate_correlation_id()
 
 
+# Purpose: Return correlation id for the observability workflow.
 def get_correlation_id() -> str | None:
     return _CORRELATION_ID.get()
 
 
+# Purpose: Return request id for the observability workflow.
 def get_request_id() -> str | None:
     return _REQUEST_ID.get()
 
 
+# Purpose: Handle correlation context for the observability workflow.
 @contextmanager
 def correlation_context(
     *,

@@ -1,3 +1,5 @@
+# Module purpose: Implement snapshot behavior for the change-set domain.
+
 import shutil
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from app.services.indexing.scanner import (
 )
 
 
+# Purpose: Parse status paths for the change-set workflow.
 def parse_status_paths(
     status_output: str,
 ) -> list[str]:
@@ -40,6 +43,7 @@ def parse_status_paths(
     ]
 
 
+# Purpose: Handle safe unlink untracked for the change-set workflow.
 def safe_unlink_untracked(
     repository_path: Path,
     path: str,
@@ -89,6 +93,7 @@ def safe_unlink_untracked(
             shutil.rmtree(candidate)
 
 
+# Purpose: Handle rollback workspace for the change-set workflow.
 def rollback_workspace(
     repository_path: Path,
 ) -> None:
@@ -133,6 +138,7 @@ def rollback_workspace(
         )
 
 
+# Purpose: Handle status contains untracked for the change-set workflow.
 def status_contains_untracked(
     status_output: str,
     path: str,

@@ -1,3 +1,5 @@
+# Module purpose: Implement reconciler behavior for the task lifecycle domain.
+
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -62,7 +64,9 @@ STALE_STATE_THRESHOLDS = {
 }
 
 
+# Purpose: Encapsulate task reconciler behavior for the task lifecycle domain.
 class TaskReconciler:
+    # Purpose: Initialize task reconciler state and dependencies.
     def __init__(
         self,
         *,
@@ -72,6 +76,7 @@ class TaskReconciler:
             task_service or TaskService()
         )
 
+    # Purpose: Reconcile task for the task lifecycle workflow.
     async def reconcile_task(
         self,
         *,
@@ -134,6 +139,7 @@ class TaskReconciler:
             )
             return task
 
+    # Purpose: Record stale if needed for the task lifecycle workflow.
     async def record_stale_if_needed(
         self,
         *,
@@ -162,6 +168,7 @@ class TaskReconciler:
         )
         return stale
 
+    # Purpose: Load evidence for the task lifecycle workflow.
     async def load_evidence(
         self,
         *,
@@ -202,6 +209,7 @@ class TaskReconciler:
         }
 
 
+# Purpose: Handle latest for the task lifecycle workflow.
 async def latest(
     db: AsyncSession,
     model,
@@ -220,6 +228,7 @@ async def latest(
     return result.first()
 
 
+# Purpose: Detect stale task for the task lifecycle workflow.
 def detect_stale_task(
     task,
     *,
@@ -260,6 +269,7 @@ def detect_stale_task(
     }
 
 
+# Purpose: Classify task from evidence for the task lifecycle workflow.
 def classify_task_from_evidence(
     evidence: dict,
 ) -> tuple[str, dict, str | None] | None:

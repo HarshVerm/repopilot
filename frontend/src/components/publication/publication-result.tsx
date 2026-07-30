@@ -1,9 +1,12 @@
+// Module purpose: Render and coordinate the publication result interface.
+
 import { ExternalLink, GitPullRequest } from "lucide-react";
 import type { PublicationResponse } from "@/types/api";
 import { CopyButton } from "@/components/shared/copy-button";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateTime, shortSha } from "@/lib/formatters";
 
+/** Purpose: Render the publication result interface. */
 export function PublicationResult({ publication }: { publication: PublicationResponse | null | undefined }) {
   if (!publication) {
     return (
@@ -47,6 +50,14 @@ export function PublicationResult({ publication }: { publication: PublicationRes
         <Pair label="PR Number" value={publication.pull_request_number ? `#${publication.pull_request_number}` : "—"} />
         <Pair label="Branch" value={publication.head_branch ?? "—"} />
         <Pair label="Commit" value={shortSha(publication.commit_sha)} />
+        <Pair
+          label="PR Author"
+          value={
+            publication.pull_request_author_login
+              ? `@${publication.pull_request_author_login}`
+              : "—"
+          }
+        />
         <Pair label="Base Branch" value={publication.base_branch ?? "—"} />
         <Pair label="Published" value={formatDateTime(publication.published_at ?? publication.pr_created_at)} />
         <Pair label="Retries" value={String(publication.retry_count)} />
@@ -67,6 +78,7 @@ export function PublicationResult({ publication }: { publication: PublicationRes
   );
 }
 
+/** Purpose: Render the pair interface. */
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">

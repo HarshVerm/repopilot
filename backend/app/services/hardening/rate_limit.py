@@ -1,3 +1,5 @@
+# Module purpose: Implement rate limit behavior for the application hardening domain.
+
 import time
 from dataclasses import dataclass
 
@@ -6,13 +8,16 @@ from fastapi import HTTPException, Request, status
 from app.core.config import settings
 
 
+# Purpose: Encapsulate rate limit decision behavior for the application hardening domain.
 @dataclass(frozen=True)
 class RateLimitDecision:
     allowed: bool
     retry_after_seconds: int | None
 
 
+# Purpose: Encapsulate rate limit exceeded behavior for the application hardening domain.
 class RateLimitExceeded(RuntimeError):
+    # Purpose: Initialize rate limit exceeded state and dependencies.
     def __init__(
         self,
         *,
@@ -24,13 +29,16 @@ class RateLimitExceeded(RuntimeError):
         self.retry_after_seconds = retry_after_seconds
 
 
+# Purpose: Encapsulate in memory rate limiter behavior for the application hardening domain.
 class InMemoryRateLimiter:
+    # Purpose: Initialize in memory rate limiter state and dependencies.
     def __init__(self) -> None:
         self._buckets: dict[
             tuple[str, str],
             list[float],
         ] = {}
 
+    # Purpose: Check application hardening for the application hardening workflow.
     def check(
         self,
         *,
@@ -78,6 +86,7 @@ class InMemoryRateLimiter:
             retry_after_seconds=None,
         )
 
+    # Purpose: Reset application hardening for the application hardening workflow.
     def reset(self) -> None:
         self._buckets.clear()
 
@@ -96,9 +105,11 @@ RATE_LIMITS_BY_OPERATION = {
 rate_limiter = InMemoryRateLimiter()
 
 
+# Purpose: Handle enforce rate limit for the application hardening workflow.
 def enforce_rate_limit(
     operation: str,
 ):
+    # Purpose: Handle dependency for the application hardening workflow.
     async def dependency(
         request: Request,
     ) -> None:
@@ -132,6 +143,7 @@ def enforce_rate_limit(
     return dependency
 
 
+# Purpose: Handle rate limit key for the application hardening workflow.
 def rate_limit_key(
     request: Request,
 ) -> str:

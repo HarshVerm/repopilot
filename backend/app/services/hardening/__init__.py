@@ -1,3 +1,5 @@
+# Module purpose: Expose the hardening package.
+
 from app.services.hardening.limits import (
     configuration_snapshot,
     hardening_checklist,

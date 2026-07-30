@@ -1,3 +1,5 @@
+// Module purpose: Provide reusable task status frontend utilities.
+
 import type { TaskResponse, TaskStatus } from "@/types/api";
 import type { LifecycleStage, LifecycleStageId, LifecycleStageState } from "@/types/task";
 import {
@@ -76,22 +78,27 @@ const waitingStatuses = new Set<TaskStatus>(WAITING_TASK_STATUSES);
 const activeStatuses = new Set<TaskStatus>(ACTIVE_TASK_STATUSES);
 const terminalStatuses = new Set<TaskStatus>(TERMINAL_TASK_STATUSES);
 
+/** Purpose: Check whether active task for this frontend workflow. */
 export function isActiveTask(task: Pick<TaskResponse, "status">) {
   return activeStatuses.has(task.status);
 }
 
+/** Purpose: Check whether terminal task for this frontend workflow. */
 export function isTerminalTask(task: Pick<TaskResponse, "status">) {
   return terminalStatuses.has(task.status);
 }
 
+/** Purpose: Check whether waiting for human for this frontend workflow. */
 export function isWaitingForHuman(task: Pick<TaskResponse, "status">) {
   return waitingStatuses.has(task.status);
 }
 
+/** Purpose: Check whether cancellable status for this frontend workflow. */
 export function isCancellableStatus(status: TaskStatus) {
   return !terminalStatuses.has(status) && status !== "publishing";
 }
 
+/** Purpose: Check whether restartable status for this frontend workflow. */
 export function isRestartableStatus(status: TaskStatus) {
   return (
     status === "failed" ||
@@ -100,6 +107,7 @@ export function isRestartableStatus(status: TaskStatus) {
   );
 }
 
+/** Purpose: Handle task status tone for this frontend module. */
 export function taskStatusTone(status: string): "success" | "active" | "attention" | "error" | "neutral" {
   if (status === "completed" || status === "approved" || status === "published" || status === "passed") {
     return "success";
@@ -120,6 +128,7 @@ export function taskStatusTone(status: string): "success" | "active" | "attentio
   return "neutral";
 }
 
+/** Purpose: Return task lifecycle for this frontend workflow. */
 export function getTaskLifecycle(
   task: Pick<TaskResponse, "status" | "failure_category" | "current_step">,
 ): LifecycleStage[] {

@@ -1,3 +1,5 @@
+// Module purpose: Define the shared application layout and metadata.
+
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell/app-shell";
@@ -9,6 +11,7 @@ export const metadata: Metadata = {
   description: "AI software engineering console for GitHub issue workflows.",
 };
 
+/** Purpose: Render the root layout interface. */
 export default function RootLayout({
   children,
 }: Readonly<{

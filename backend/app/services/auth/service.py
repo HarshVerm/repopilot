@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the authentication domain.
+
 import hashlib
 import hmac
 import secrets
@@ -14,6 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.db.models.identity import OAuthState, User, UserSession
 from app.db.session import get_db
+from app.services.auth.github_tokens import (
+    GitHubOAuthTokenSet,
+    GitHubUserAuthorizationRequired,
+)
 
 
 AUTH_REQUIRED = "AUTH_REQUIRED"
@@ -21,12 +27,14 @@ SESSION_EXPIRED = "SESSION_EXPIRED"
 CSRF_FAILED = "CSRF_FAILED"
 
 
+# Purpose: Represent auth context data.
 @dataclass(frozen=True)
 class AuthContext:
     user: User
     session: UserSession
 
 
+# Purpose: Handle secret hash for the authentication workflow.
 def secret_hash(value: str) -> str:
     return hmac.new(
         settings.session_secret.encode("utf-8"),
@@ -35,6 +43,7 @@ def secret_hash(value: str) -> str:
     ).hexdigest()
 
 
+# Purpose: Handle auth error for the authentication workflow.
 def auth_error(
     *,
     status_code: int,
@@ -55,7 +64,9 @@ def auth_error(
     )
 
 
+# Purpose: Coordinate auth operations.
 class AuthService:
+    # Purpose: Create oauth state for the authentication workflow.
     async def create_oauth_state(
         self,
         *,
@@ -79,6 +90,7 @@ class AuthService:
         await db.commit()
         return state
 
+    # Purpose: Consume oauth state for the authentication workflow.
     async def consume_oauth_state(
         self,
         *,
@@ -116,6 +128,7 @@ class AuthService:
         await db.commit()
         return record
 
+    # Purpose: Handle github login url for the authentication workflow.
     def github_login_url(self, state: str) -> str:
         if not settings.github_app_client_id:
             raise auth_error(
@@ -135,7 +148,11 @@ class AuthService:
         )
         return f"https://github.com/login/oauth/authorize?{query}"
 
-    async def exchange_code(self, code: str) -> str:
+    # Purpose: Exchange code for the authentication workflow.
+    async def exchange_code(
+        self,
+        code: str,
+    ) -> GitHubOAuthTokenSet:
         if (
             not settings.github_app_client_id
             or not settings.github_app_client_secret
@@ -163,15 +180,18 @@ class AuthService:
             )
             response.raise_for_status()
             payload = response.json()
-        token = payload.get("access_token")
-        if not isinstance(token, str) or not token:
+        try:
+            return GitHubOAuthTokenSet.from_payload(
+                payload
+            )
+        except GitHubUserAuthorizationRequired as exc:
             raise auth_error(
                 status_code=401,
                 code="GITHUB_OAUTH_FAILED",
                 message="GitHub did not authorize this login.",
-            )
-        return token
+            ) from exc
 
+    # Purpose: Fetch github identity for the authentication workflow.
     async def fetch_github_identity(
         self,
         access_token: str,
@@ -219,6 +239,7 @@ class AuthService:
 
         return user_data, email, installations
 
+    # Purpose: Create or update user for the authentication workflow.
     async def upsert_user(
         self,
         *,
@@ -249,6 +270,7 @@ class AuthService:
         await db.refresh(user)
         return user
 
+    # Purpose: Create session for the authentication workflow.
     async def create_session(
         self,
         *,
@@ -269,6 +291,7 @@ class AuthService:
         await db.refresh(session)
         return session, token, csrf_token
 
+    # Purpose: Revoke session for the authentication workflow.
     async def revoke_session(
         self,
         *,
@@ -279,6 +302,7 @@ class AuthService:
         await db.commit()
 
 
+# Purpose: Return optional auth context for the authentication workflow.
 async def get_optional_auth_context(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -314,6 +338,7 @@ async def get_optional_auth_context(
     return AuthContext(user=user, session=session)
 
 
+# Purpose: Require auth context, raising an error when unavailable.
 async def require_auth_context(
     context: AuthContext | None = Depends(
         get_optional_auth_context
@@ -328,12 +353,14 @@ async def require_auth_context(
     return context
 
 
+# Purpose: Require current user, raising an error when unavailable.
 async def require_current_user(
     context: AuthContext = Depends(require_auth_context),
 ) -> User:
     return context.user
 
 
+# Purpose: Require csrf, raising an error when unavailable.
 async def require_csrf(
     request: Request,
     context: AuthContext = Depends(require_auth_context),
@@ -345,6 +372,7 @@ async def require_csrf(
     return context.user
 
 
+# Purpose: Validate csrf tokens for the authentication workflow.
 def validate_csrf_tokens(
     *,
     request: Request,
@@ -375,6 +403,7 @@ def validate_csrf_tokens(
         )
 
 
+# Purpose: Handle preferred email for the authentication workflow.
 def preferred_email(emails: list[dict]) -> str | None:
     verified = [
         item
@@ -389,6 +418,7 @@ def preferred_email(emails: list[dict]) -> str | None:
     return str(selected["email"]) if selected else None
 
 
+# Purpose: Handle safe redirect path for the authentication workflow.
 def safe_redirect_path(path: str) -> str:
     if not path.startswith("/") or path.startswith("//"):
         return "/tasks"

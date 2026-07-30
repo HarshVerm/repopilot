@@ -1,3 +1,5 @@
+# Module purpose: Define validated debugging API payload schemas.
+
 from pydantic import (
     BaseModel,
     Field,
@@ -5,6 +7,7 @@ from pydantic import (
 )
 
 
+# Purpose: Validate and represent debugger output data.
 class DebuggerOutput(BaseModel):
     model_config = ConfigDict(
         extra="forbid"
@@ -40,6 +43,7 @@ class DebuggerOutput(BaseModel):
     )
 
 
+# Purpose: Validate and represent debug attempt history item data.
 class DebugAttemptHistoryItem(BaseModel):
     debug_attempt_id: str
     attempt: int
@@ -53,6 +57,7 @@ class DebugAttemptHistoryItem(BaseModel):
     stop_reason: str | None = None
 
 
+# Purpose: Validate and represent debug run response data.
 class DebugRunResponse(BaseModel):
     status: str
     reason: str | None = None
@@ -62,6 +67,7 @@ class DebugRunResponse(BaseModel):
     history: list[DebugAttemptHistoryItem]
 
 
+# Purpose: Represent the debug attempt response API data.
 class DebugAttemptResponse(DebugAttemptHistoryItem):
     workspace_id: str
     plan_id: str

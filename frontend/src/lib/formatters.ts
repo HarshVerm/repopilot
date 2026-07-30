@@ -1,3 +1,5 @@
+// Module purpose: Provide reusable formatters frontend utilities.
+
 import type { TaskResponse } from "@/types/api";
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -12,10 +14,12 @@ const compactFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 });
 
+/** Purpose: Handle repository full name for this frontend module. */
 export function repositoryFullName(task: Pick<TaskResponse, "repository">) {
   return `${task.repository.owner}/${task.repository.repo}`;
 }
 
+/** Purpose: Format date time for this frontend workflow. */
 export function formatDateTime(value: string | null | undefined) {
   if (!value) {
     return "—";
@@ -29,6 +33,7 @@ export function formatDateTime(value: string | null | undefined) {
   return dateFormatter.format(date);
 }
 
+/** Purpose: Format duration for this frontend workflow. */
 export function formatDuration(startedAt?: string | null, endedAt?: string | null) {
   if (!startedAt) {
     return "—";
@@ -56,6 +61,7 @@ export function formatDuration(startedAt?: string | null, endedAt?: string | nul
   return `${hours}h ${remainingMinutes}m`;
 }
 
+/** Purpose: Format number for this frontend workflow. */
 export function formatNumber(value: unknown) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "—";
@@ -64,6 +70,7 @@ export function formatNumber(value: unknown) {
   return compactFormatter.format(value);
 }
 
+/** Purpose: Format status for this frontend workflow. */
 export function formatStatus(value: string) {
   return value
     .split("_")
@@ -72,10 +79,12 @@ export function formatStatus(value: string) {
     .join(" ");
 }
 
+/** Purpose: Handle short sha for this frontend module. */
 export function shortSha(value: string | null | undefined) {
   return value ? value.slice(0, 12) : "—";
 }
 
+/** Purpose: Handle metric value for this frontend module. */
 export function metricValue(metrics: Record<string, unknown> | null | undefined, path: string[]) {
   let current: unknown = metrics;
   for (const key of path) {

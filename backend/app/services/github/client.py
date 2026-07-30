@@ -1,3 +1,5 @@
+# Module purpose: Implement client behavior for the GitHub integration domain.
+
 import httpx
 
 from app.core.config import settings
@@ -7,9 +9,11 @@ from app.services.hardening.retries import (
 )
 
 
+# Purpose: Provide the git hub client integration boundary.
 class GitHubClient:
     base_url = "https://api.github.com"
 
+    # Purpose: Initialize git hub client state and dependencies.
     def __init__(
         self,
         *,
@@ -17,6 +21,7 @@ class GitHubClient:
     ) -> None:
         self._client = client
 
+    # Purpose: Handle headers for the GitHub integration workflow.
     def _headers(self) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
@@ -28,6 +33,7 @@ class GitHubClient:
 
         return headers
 
+    # Purpose: Handle timeout for the GitHub integration workflow.
     def _timeout(self) -> httpx.Timeout:
         return httpx.Timeout(
             timeout=settings.github_timeout_seconds,
@@ -37,6 +43,7 @@ class GitHubClient:
             pool=settings.github_connect_timeout_seconds,
         )
 
+    # Purpose: Handle limits for the GitHub integration workflow.
     def _limits(self) -> httpx.Limits:
         return httpx.Limits(
             max_connections=settings.http_max_connections,
@@ -45,6 +52,7 @@ class GitHubClient:
             ),
         )
 
+    # Purpose: Return client for the GitHub integration workflow.
     def get_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
@@ -57,16 +65,19 @@ class GitHubClient:
 
         return self._client
 
+    # Purpose: Handle close for the GitHub integration workflow.
     async def close(self) -> None:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
 
+    # Purpose: Return GitHub integration for the GitHub integration workflow.
     async def _get(
         self,
         path: str,
         params: dict[str, str] | None = None,
     ) -> dict | list[dict]:
+        # Purpose: Request GitHub integration for the GitHub integration workflow.
         async def request() -> dict | list[dict]:
             response = await self.get_client().get(
                 path,
@@ -82,6 +93,7 @@ class GitHubClient:
             ),
         )
 
+    # Purpose: Return repository for the GitHub integration workflow.
     async def get_repository(
         self,
         owner: str,
@@ -91,6 +103,7 @@ class GitHubClient:
         assert isinstance(data, dict)
         return data
 
+    # Purpose: List issues for the GitHub integration workflow.
     async def list_issues(
         self,
         owner: str,
@@ -104,6 +117,7 @@ class GitHubClient:
         assert isinstance(data, list)
         return data
 
+    # Purpose: Return issue for the GitHub integration workflow.
     async def get_issue(
         self,
         owner: str,

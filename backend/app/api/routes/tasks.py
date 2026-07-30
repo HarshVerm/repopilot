@@ -1,3 +1,5 @@
+# Module purpose: Define tasks HTTP API routes.
+
 from typing import Annotated
 from uuid import UUID
 
@@ -80,14 +82,17 @@ router = APIRouter(
 )
 
 
+# Purpose: Return github client for the task lifecycle workflow.
 def get_github_client():
     return github_client
 
 
+# Purpose: Return github app client for the task lifecycle workflow.
 def get_github_app_client() -> GitHubAppClient:
     return github_app_client
 
 
+# Purpose: Create task for the task lifecycle workflow.
 @router.post(
     "",
     response_model=TaskResponse,
@@ -235,6 +240,7 @@ async def create_task(
     )
 
 
+# Purpose: List tasks for the task lifecycle workflow.
 @router.get(
     "",
     response_model=TaskListResponse,
@@ -291,6 +297,7 @@ async def list_tasks(
     }
 
 
+# Purpose: Return task for the task lifecycle workflow.
 @router.get(
     "/{task_id}",
     response_model=TaskResponse,
@@ -327,6 +334,7 @@ async def get_task(
     )
 
 
+# Purpose: Return task timeline for the task lifecycle workflow.
 @router.get(
     "/{task_id}/timeline",
     response_model=TaskTimelineResponse,
@@ -387,6 +395,7 @@ async def get_task_timeline(
     }
 
 
+# Purpose: Return task metrics for the task lifecycle workflow.
 @router.get(
     "/{task_id}/metrics",
     response_model=TaskMetricsResponse,
@@ -419,6 +428,7 @@ async def get_task_metrics(
     }
 
 
+# Purpose: Cancel task for the task lifecycle workflow.
 @router.post(
     "/{task_id}/cancel",
     response_model=CancelTaskResponse,
@@ -463,6 +473,7 @@ async def cancel_task(
     )
 
 
+# Purpose: Handle restart task for the task lifecycle workflow.
 @router.post(
     "/{task_id}/restart",
     response_model=TaskResponse,
@@ -622,6 +633,7 @@ async def restart_task(
     )
 
 
+# Purpose: Reconcile task for the task lifecycle workflow.
 @router.post(
     "/{task_id}/reconcile",
     response_model=ReconcileTaskResponse,
@@ -664,6 +676,7 @@ async def reconcile_task(
     }
 
 
+# Purpose: Summarize metrics for the task lifecycle workflow.
 def summarize_metrics(
     metrics: dict,
 ) -> dict:
@@ -683,6 +696,7 @@ def summarize_metrics(
     }
 
 
+# Purpose: Handle authorized task for the task lifecycle workflow.
 async def authorized_task(
     *,
     task_id: UUID,
@@ -704,6 +718,7 @@ async def authorized_task(
     return task
 
 
+# Purpose: Require mutation access, raising an error when unavailable.
 def require_mutation_access(
     *,
     request: Request,
@@ -719,6 +734,7 @@ def require_mutation_access(
     return auth.user
 
 
+# Purpose: Require legacy api, raising an error when unavailable.
 def require_legacy_api() -> None:
     if not settings.allow_legacy_unauthenticated_api:
         raise auth_error(
@@ -728,6 +744,7 @@ def require_legacy_api() -> None:
         )
 
 
+# Purpose: Derive issue summary for the task lifecycle workflow.
 def derive_issue_summary(issue: dict) -> str:
     title = str(issue.get("title") or "GitHub issue").strip()
     body = str(issue.get("body") or "").strip()

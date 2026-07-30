@@ -1,3 +1,5 @@
+# Module purpose: Implement git behavior for the change-set domain.
+
 import subprocess
 from pathlib import Path
 
@@ -6,14 +8,17 @@ from app.services.indexing.scanner import (
 )
 
 
+# Purpose: Signal dirty workspace failures.
 class DirtyWorkspaceError(RuntimeError):
     pass
 
 
+# Purpose: Signal git command failures.
 class GitCommandError(RuntimeError):
     pass
 
 
+# Purpose: Run git for the change-set workflow.
 def run_git(
     repository_path: Path,
     args: list[str],
@@ -39,6 +44,7 @@ def run_git(
     return result.stdout
 
 
+# Purpose: Return git status for the change-set workflow.
 def get_git_status(
     repository_path: Path,
 ) -> str:
@@ -51,6 +57,7 @@ def get_git_status(
     )
 
 
+# Purpose: Require clean workspace, raising an error when unavailable.
 def require_clean_workspace(
     repository_path: Path,
 ) -> None:
@@ -64,6 +71,7 @@ def require_clean_workspace(
         )
 
 
+# Purpose: Return base commit sha for the change-set workflow.
 def get_base_commit_sha(
     repository_path: Path,
 ) -> str:
@@ -76,6 +84,7 @@ def get_base_commit_sha(
     ).strip()
 
 
+# Purpose: Return tree hash for the change-set workflow.
 def get_tree_hash(
     repository_path: Path,
 ) -> str:
@@ -88,6 +97,7 @@ def get_tree_hash(
     ).strip()
 
 
+# Purpose: Return git diff for the change-set workflow.
 def get_git_diff(
     repository_path: Path,
 ) -> str:
@@ -119,6 +129,7 @@ def get_git_diff(
     )
 
 
+# Purpose: Return untracked files for the change-set workflow.
 def get_untracked_files(
     repository_path: Path,
 ) -> list[str]:
@@ -155,6 +166,7 @@ def get_untracked_files(
     )
 
 
+# Purpose: Return untracked file diff for the change-set workflow.
 def get_untracked_file_diff(
     repository_path: Path,
     file_path: str,
@@ -196,6 +208,7 @@ def get_untracked_file_diff(
     return result.stdout
 
 
+# Purpose: Validate untracked file path for the change-set workflow.
 def validate_untracked_file_path(
     repository_path: Path,
     file_path: str,
@@ -244,6 +257,7 @@ def validate_untracked_file_path(
     return resolved_path
 
 
+# Purpose: Return changed files for the change-set workflow.
 def get_changed_files(
     repository_path: Path,
 ) -> list[str]:
@@ -269,6 +283,7 @@ def get_changed_files(
     )
 
 
+# Purpose: Return numstat for the change-set workflow.
 def get_numstat(
     repository_path: Path,
 ) -> dict[str, tuple[int, int]]:
@@ -325,6 +340,7 @@ def get_numstat(
     return stats
 
 
+# Purpose: Return file at head for the change-set workflow.
 def get_file_at_head(
     repository_path: Path,
     file_path: str,

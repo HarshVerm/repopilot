@@ -1,3 +1,5 @@
+# Module purpose: Implement installations behavior for the GitHub integration domain.
+
 import uuid
 from datetime import UTC, datetime
 
@@ -21,7 +23,9 @@ from app.services.github.permissions import (
 )
 
 
+# Purpose: Coordinate installation operations.
 class InstallationService:
+    # Purpose: Initialize installation service state and dependencies.
     def __init__(
         self,
         *,
@@ -29,6 +33,7 @@ class InstallationService:
     ) -> None:
         self.github = github or github_app_client
 
+    # Purpose: Synchronize installations for the GitHub integration workflow.
     async def sync_installations(
         self,
         *,
@@ -67,6 +72,7 @@ class InstallationService:
         await db.commit()
         return records
 
+    # Purpose: Connect installation for the GitHub integration workflow.
     async def connect_installation(
         self,
         *,
@@ -97,6 +103,7 @@ class InstallationService:
         )
         return installation
 
+    # Purpose: Create or update installation for the GitHub integration workflow.
     async def upsert_installation(
         self,
         *,
@@ -149,6 +156,7 @@ class InstallationService:
             await db.refresh(installation)
         return installation
 
+    # Purpose: List installations for the GitHub integration workflow.
     async def list_installations(
         self,
         *,
@@ -167,6 +175,7 @@ class InstallationService:
             )
         )
 
+    # Purpose: Return user installation for the GitHub integration workflow.
     async def get_user_installation(
         self,
         *,
@@ -195,6 +204,7 @@ class InstallationService:
             )
         return installation
 
+    # Purpose: Synchronize repositories for the GitHub integration workflow.
     async def sync_repositories(
         self,
         *,
@@ -316,12 +326,14 @@ class InstallationService:
         return records
 
 
+# Purpose: Parse datetime for the GitHub integration workflow.
 def parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+# Purpose: Handle installation http error for the GitHub integration workflow.
 def installation_http_error(
     exc: httpx.HTTPStatusError,
 ):
@@ -373,6 +385,7 @@ def installation_http_error(
     )
 
 
+# Purpose: Handle github app configuration error for the GitHub integration workflow.
 def github_app_configuration_error():
     return auth_error(
         status_code=503,

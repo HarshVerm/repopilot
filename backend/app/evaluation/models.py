@@ -1,3 +1,5 @@
+# Module purpose: Implement models behavior for the evaluation domain.
+
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -38,6 +40,7 @@ VerificationStatus = Literal[
 ]
 
 
+# Purpose: Validate and represent evaluation task data.
 class EvaluationTask(BaseModel):
     id: str = Field(
         min_length=3,
@@ -81,6 +84,7 @@ class EvaluationTask(BaseModel):
         default_factory=list
     )
 
+    # Purpose: Validate relative paths for the evaluation workflow.
     @field_validator(
         "fixture_path",
         "hidden_test_path",
@@ -103,6 +107,7 @@ class EvaluationTask(BaseModel):
 
         return path.as_posix()
 
+    # Purpose: Validate non empty strings for the evaluation workflow.
     @field_validator(
         "relevant_files",
         "expected_modified_files",
@@ -130,6 +135,7 @@ class EvaluationTask(BaseModel):
             for item in value
         ]
 
+    # Purpose: Handle agent visible payload for the evaluation workflow.
     def agent_visible_payload(
         self,
     ) -> dict[str, Any]:
@@ -149,12 +155,14 @@ class EvaluationTask(BaseModel):
         }
 
 
+# Purpose: Validate and represent evaluation suite definition data.
 class EvaluationSuiteDefinition(BaseModel):
     suite_name: str
     suite_version: str
     tasks: list[EvaluationTask]
 
 
+# Purpose: Validate and represent verification results data.
 class VerificationResults(BaseModel):
     tests: VerificationStatus = "SKIPPED"
     lint: VerificationStatus = "SKIPPED"
@@ -162,6 +170,7 @@ class VerificationResults(BaseModel):
     build: VerificationStatus = "SKIPPED"
 
 
+# Purpose: Validate and represent evaluation task result data data.
 class EvaluationTaskResultData(BaseModel):
     evaluation_task_id: str
     status: TaskResultStatus
@@ -198,6 +207,7 @@ class EvaluationTaskResultData(BaseModel):
     security_violations_applied: int = 0
 
 
+# Purpose: Validate and represent evaluation run data data.
 class EvaluationRunData(BaseModel):
     run_id: str
     suite_name: str

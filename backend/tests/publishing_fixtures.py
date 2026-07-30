@@ -147,6 +147,7 @@ class FakeGitHubPublisher:
                 "base": base_branch,
                 "title": title,
                 "body": body,
+                "credentials": credentials,
             }
         )
 

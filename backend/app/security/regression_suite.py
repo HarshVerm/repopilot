@@ -1,3 +1,5 @@
+# Module purpose: Implement regression suite behavior for the security domain.
+
 import ast
 import inspect
 import os
@@ -42,6 +44,7 @@ from app.services.sandbox.results import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
+# Purpose: Represent security regression result data.
 @dataclass(frozen=True)
 class SecurityRegressionResult:
     security_test_id: str
@@ -53,6 +56,7 @@ class SecurityRegressionResult:
     details: str
     critical: bool = True
 
+    # Purpose: Handle to dict for the security workflow.
     def to_dict(
         self,
     ) -> dict:
@@ -61,7 +65,9 @@ class SecurityRegressionResult:
         )
 
 
+# Purpose: Encapsulate security regression suite behavior for the security domain.
 class SecurityRegressionSuite:
+    # Purpose: Run security for the security workflow.
     def run(
         self,
     ) -> list[SecurityRegressionResult]:
@@ -114,6 +120,7 @@ class SecurityRegressionSuite:
             self.diff_hash_tampering_block(),
         ]
 
+    # Purpose: Handle editor block for the security workflow.
     def editor_block(
         self,
         security_test_id: str,
@@ -190,6 +197,7 @@ class SecurityRegressionSuite:
             details="RepoPilotPatchEditor policy check",
         )
 
+    # Purpose: Handle symlink escape for the security workflow.
     def symlink_escape(
         self,
     ) -> SecurityRegressionResult:
@@ -242,6 +250,7 @@ class SecurityRegressionSuite:
             details="Symlink target outside workspace remained unchanged",
         )
 
+    # Purpose: Handle shell injection for the security workflow.
     def shell_injection(
         self,
     ) -> SecurityRegressionResult:
@@ -263,6 +272,7 @@ class SecurityRegressionSuite:
             details="No subprocess call may request a shell",
         )
 
+    # Purpose: Handle docker socket absent for the security workflow.
     def docker_socket_absent(
         self,
     ) -> SecurityRegressionResult:
@@ -287,6 +297,7 @@ class SecurityRegressionSuite:
             details="Docker run args inspected",
         )
 
+    # Purpose: Handle host secret absent for the security workflow.
     def host_secret_absent(
         self,
     ) -> SecurityRegressionResult:
@@ -314,6 +325,7 @@ class SecurityRegressionSuite:
             details="Sandbox environment allowlist inspected",
         )
 
+    # Purpose: Handle cross workspace block for the security workflow.
     def cross_workspace_block(
         self,
     ) -> SecurityRegressionResult:
@@ -371,6 +383,7 @@ class SecurityRegressionSuite:
             details="Workspace B remained unchanged",
         )
 
+    # Purpose: Handle cross repository publish block for the security workflow.
     def cross_repository_publish_block(
         self,
     ) -> SecurityRegressionResult:
@@ -410,6 +423,7 @@ class SecurityRegressionSuite:
             details="Review repository snapshot mismatch",
         )
 
+    # Purpose: Handle unapproved publish block for the security workflow.
     def unapproved_publish_block(
         self,
     ) -> SecurityRegressionResult:
@@ -442,6 +456,7 @@ class SecurityRegressionSuite:
             details="Only approved FinalReviews can publish",
         )
 
+    # Purpose: Handle default branch block for the security workflow.
     def default_branch_block(
         self,
     ) -> SecurityRegressionResult:
@@ -468,6 +483,7 @@ class SecurityRegressionSuite:
             details="Publication branch cannot be default branch",
         )
 
+    # Purpose: Handle force push absent for the security workflow.
     def force_push_absent(
         self,
     ) -> SecurityRegressionResult:
@@ -495,6 +511,7 @@ class SecurityRegressionSuite:
             details="SafeGitPublisher.push_branch inspected",
         )
 
+    # Purpose: Handle diff hash tampering block for the security workflow.
     def diff_hash_tampering_block(
         self,
     ) -> SecurityRegressionResult:
@@ -524,6 +541,7 @@ class SecurityRegressionSuite:
         )
 
 
+# Purpose: Write file for the security workflow.
 def write_file(
     root: Path,
     path: str,
@@ -540,6 +558,7 @@ def write_file(
     )
 
 
+# Purpose: Snapshot files for the security workflow.
 def snapshot_files(
     root: Path,
 ) -> dict[str, str]:
@@ -553,6 +572,7 @@ def snapshot_files(
     }
 
 
+# Purpose: Handle docker args for the security workflow.
 def docker_args() -> list[str]:
     with tempfile.TemporaryDirectory(
         prefix="repopilot-security-"
@@ -584,6 +604,7 @@ def docker_args() -> list[str]:
         )
 
 
+# Purpose: Handle shell true occurrences for the security workflow.
 def shell_true_occurrences(
     root: Path,
 ) -> list[str]:

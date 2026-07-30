@@ -1,3 +1,5 @@
+# Module purpose: Implement policy behavior for the sandbox execution domain.
+
 from pathlib import Path
 
 from app.db.models.change_set import (
@@ -11,14 +13,17 @@ from app.services.changes.git import (
 )
 
 
+# Purpose: Signal invalid change set state failures.
 class InvalidChangeSetStateError(ValueError):
     pass
 
 
+# Purpose: Signal workspace state mismatch failures.
 class WorkspaceStateMismatchError(ValueError):
     pass
 
 
+# Purpose: Validate change set eligibility for the sandbox execution workflow.
 def validate_change_set_eligibility(
     change_set: ChangeSet,
 ) -> None:
@@ -33,6 +38,7 @@ def validate_change_set_eligibility(
         )
 
 
+# Purpose: Validate workspace consistency for the sandbox execution workflow.
 def validate_workspace_consistency(
     *,
     change_set: ChangeSet,
@@ -92,6 +98,7 @@ def validate_workspace_consistency(
             )
 
 
+# Purpose: Handle safe container environment for the sandbox execution workflow.
 def safe_container_environment() -> dict[str, str]:
     return {
         "CI": "true",

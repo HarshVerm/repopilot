@@ -1,3 +1,5 @@
+# Module purpose: Expose the changes package.
+
 from app.services.changes.editor import (
     PatchSecurityError,
     RepoPilotPatchEditor,

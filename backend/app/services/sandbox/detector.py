@@ -1,12 +1,16 @@
+# Module purpose: Implement detector behavior for the sandbox execution domain.
+
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
 
+# Purpose: Signal project detection failures.
 class ProjectDetectionError(ValueError):
     pass
 
 
+# Purpose: Encapsulate node project behavior for the sandbox execution domain.
 @dataclass(frozen=True)
 class NodeProject:
     package_manager: str
@@ -14,6 +18,7 @@ class NodeProject:
     scripts: dict[str, str]
 
 
+# Purpose: Encapsulate python project behavior for the sandbox execution domain.
 @dataclass(frozen=True)
 class PythonProject:
     package_manager: str
@@ -21,11 +26,13 @@ class PythonProject:
     has_requirements: bool
 
 
+# Purpose: Encapsulate project detection behavior for the sandbox execution domain.
 @dataclass(frozen=True)
 class ProjectDetection:
     node: NodeProject | None
     python: PythonProject | None
 
+    # Purpose: Handle project types for the sandbox execution workflow.
     @property
     def project_types(self) -> list[str]:
         types: list[str] = []
@@ -38,6 +45,7 @@ class ProjectDetection:
 
         return types
 
+    # Purpose: Handle to metadata for the sandbox execution workflow.
     def to_metadata(self) -> dict:
         return {
             "project_types": self.project_types,
@@ -59,6 +67,7 @@ class ProjectDetection:
         }
 
 
+# Purpose: Detect project for the sandbox execution workflow.
 def detect_project(
     repository_path: Path,
 ) -> ProjectDetection:
@@ -72,6 +81,7 @@ def detect_project(
     )
 
 
+# Purpose: Detect node project for the sandbox execution workflow.
 def detect_node_project(
     repository_path: Path,
 ) -> NodeProject | None:
@@ -145,6 +155,7 @@ def detect_node_project(
     )
 
 
+# Purpose: Detect python project for the sandbox execution workflow.
 def detect_python_project(
     repository_path: Path,
 ) -> PythonProject | None:

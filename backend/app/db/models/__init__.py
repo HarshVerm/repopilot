@@ -1,3 +1,5 @@
+# Module purpose: Expose the models package.
+
 from app.db.models.code_index import (
     CodeSymbol,
     RepositoryFile,
@@ -14,6 +16,7 @@ from app.db.models.debug_attempt import DebugAttempt
 from app.db.models.final_review import FinalReview
 from app.db.models.identity import (
     GitHubInstallation,
+    GitHubUserAuthorization,
     OAuthState,
     Repository,
     User,
@@ -43,6 +46,7 @@ __all__ = [
     "EvaluationTaskResult",
     "FinalReview",
     "GitHubInstallation",
+    "GitHubUserAuthorization",
     "OAuthState",
     "Publication",
     "RepoPilotTask",

@@ -1,3 +1,5 @@
+# Module purpose: Define validated reviews API payload schemas.
+
 from pydantic import (
     BaseModel,
     Field,
@@ -5,6 +7,7 @@ from pydantic import (
 from uuid import UUID
 
 
+# Purpose: Validate and represent reject review request data.
 class RejectReviewRequest(BaseModel):
     reason: str | None = Field(
         default=None,
@@ -12,6 +15,7 @@ class RejectReviewRequest(BaseModel):
     )
 
 
+# Purpose: Validate and represent task review action request data.
 class TaskReviewActionRequest(BaseModel):
     review_id: UUID
     changeset_id: UUID
@@ -21,6 +25,7 @@ class TaskReviewActionRequest(BaseModel):
     )
 
 
+# Purpose: Represent the request changes request API data.
 class RequestChangesRequest(TaskReviewActionRequest):
     feedback: str = Field(
         min_length=1,
@@ -28,6 +33,7 @@ class RequestChangesRequest(TaskReviewActionRequest):
     )
 
 
+# Purpose: Represent the reject task review request API data.
 class RejectTaskReviewRequest(TaskReviewActionRequest):
     reason: str | None = Field(
         default=None,
@@ -35,6 +41,7 @@ class RejectTaskReviewRequest(TaskReviewActionRequest):
     )
 
 
+# Purpose: Validate and represent review decision response data.
 class ReviewDecisionResponse(BaseModel):
     review_id: str
     status: str
@@ -44,6 +51,7 @@ class ReviewDecisionResponse(BaseModel):
     feedback: str | None = None
 
 
+# Purpose: Validate and represent final review response data.
 class FinalReviewResponse(BaseModel):
     review_id: str
     status: str

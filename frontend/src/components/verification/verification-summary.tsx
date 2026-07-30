@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the verification summary interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { Terminal } from "lucide-react";
 import type { TaskResponse } from "@/types/api";
@@ -11,6 +13,7 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { CopyButton } from "@/components/shared/copy-button";
 
+/** Purpose: Render the verification summary interface. */
 export function VerificationSummary({ task }: { task: TaskResponse }) {
   const query = useQuery({
     queryKey: task.active_execution_run_id
@@ -111,6 +114,7 @@ export function VerificationSummary({ task }: { task: TaskResponse }) {
   );
 }
 
+/** Purpose: Format ms for this frontend workflow. */
 function formatMs(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}ms` : "—";
 }

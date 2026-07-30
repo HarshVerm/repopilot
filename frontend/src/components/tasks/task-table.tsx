@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task table interface.
+
 import Link from "next/link";
 import { MoreVertical } from "lucide-react";
 import type { TaskResponse } from "@/types/api";
@@ -7,6 +9,7 @@ import { formatDateTime, formatDuration, repositoryFullName } from "@/lib/format
 import { getTaskLifecycle, isWaitingForHuman } from "@/lib/task-status";
 import { TaskStatusBadge } from "./task-status-badge";
 
+/** Purpose: Render the task table interface. */
 export function TaskTable({ tasks }: { tasks: TaskResponse[] }) {
   return (
     <div className="flex-1 overflow-auto rounded-xl border border-[#27272A]">

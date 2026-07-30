@@ -1,3 +1,5 @@
+# Module purpose: Implement metrics behavior for the task lifecycle domain.
+
 import uuid
 from collections import defaultdict
 from typing import Any
@@ -27,7 +29,9 @@ from app.services.tasks.service import (
 )
 
 
+# Purpose: Coordinate task metrics operations.
 class TaskMetricsService:
+    # Purpose: Initialize task metrics service state and dependencies.
     def __init__(
         self,
         *,
@@ -37,6 +41,7 @@ class TaskMetricsService:
             pricing_service or ModelPricingService()
         )
 
+    # Purpose: Return metrics for the task lifecycle workflow.
     async def get_metrics(
         self,
         *,
@@ -191,6 +196,7 @@ class TaskMetricsService:
         }
 
 
+# Purpose: Handle aggregate agent runs for the task lifecycle workflow.
 def aggregate_agent_runs(
     agent_runs: list[AgentRun],
     pricing_service: ModelPricingService,
@@ -281,6 +287,7 @@ def aggregate_agent_runs(
     }
 
 
+# Purpose: Handle aggregate change sets for the task lifecycle workflow.
 def aggregate_change_sets(
     change_sets: list[ChangeSet],
 ) -> dict[str, int]:
@@ -313,6 +320,7 @@ def aggregate_change_sets(
     }
 
 
+# Purpose: Handle aggregate execution runs for the task lifecycle workflow.
 def aggregate_execution_runs(
     runs: list[ExecutionRun],
 ) -> dict[str, Any]:
@@ -399,6 +407,7 @@ def aggregate_execution_runs(
     }
 
 
+# Purpose: Handle aggregate retrieval for the task lifecycle workflow.
 def aggregate_retrieval(
     events: list[TaskEvent],
 ) -> dict[str, Any]:

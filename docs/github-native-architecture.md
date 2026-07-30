@@ -39,10 +39,11 @@ authenticated user
 ```
 
 GitHub OAuth establishes user identity. GitHub App installations establish
-repository authority. OAuth tokens and installation tokens are never exposed
-to browser JavaScript or persisted as long-lived installation credentials.
+repository authority. Tokens are never exposed to browser JavaScript.
 Installation tokens are minted server-side for the specific installation when
-GitHub access is required.
+GitHub access is required and are not persisted. User access and refresh
+tokens are encrypted at rest and rotated server-side so user-initiated pull
+requests can be attributed to the user.
 
 The installation setup callback is not trusted on its numeric installation ID
 alone. RepoPilot follows it with a user-bound OAuth verification and activates
@@ -93,8 +94,10 @@ queries.
 - Any new changeset supersedes prior review approval.
 - Publication requires an approved review owned by the current user and an
   exact current diff hash match.
-- Publication uses a fresh installation token and never pushes the default
-  branch, force-pushes, or merges a pull request.
+- Publication uses a fresh installation token for branch pushes and the
+  initiating user's encrypted GitHub authorization for pull-request creation.
+- Publication never pushes the default branch, force-pushes, or merges a pull
+  request.
 
 Developer setup is documented in
 [`github-app-setup.md`](./github-app-setup.md).

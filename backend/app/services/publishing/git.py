@@ -1,3 +1,5 @@
+# Module purpose: Implement git behavior for the publication domain.
+
 import os
 import shlex
 import stat
@@ -16,11 +18,14 @@ from app.services.publishing.authentication import (
 )
 
 
+# Purpose: Signal git push failures.
 class GitPushError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate safe git publisher behavior for the publication domain.
 class SafeGitPublisher:
+    # Purpose: Initialize safe git publisher state and dependencies.
     def __init__(
         self,
         *,
@@ -28,6 +33,7 @@ class SafeGitPublisher:
     ) -> None:
         self.repository_path = repository_path
 
+    # Purpose: Run publication for the publication workflow.
     def run(
         self,
         args: list[str],
@@ -59,6 +65,7 @@ class SafeGitPublisher:
 
         return result.stdout
 
+    # Purpose: Run with credentials for the publication workflow.
     def run_with_credentials(
         self,
         args: list[str],
@@ -82,6 +89,7 @@ class SafeGitPublisher:
                 secrets=secrets,
             )
 
+    # Purpose: Handle current head for the publication workflow.
     def current_head(
         self,
     ) -> str:
@@ -92,6 +100,7 @@ class SafeGitPublisher:
             ]
         ).strip()
 
+    # Purpose: Handle current branch for the publication workflow.
     def current_branch(
         self,
     ) -> str:
@@ -102,6 +111,7 @@ class SafeGitPublisher:
             ]
         ).strip()
 
+    # Purpose: Handle working tree diff for the publication workflow.
     def working_tree_diff(
         self,
     ) -> str:
@@ -109,6 +119,7 @@ class SafeGitPublisher:
             self.repository_path
         )
 
+    # Purpose: Handle staged diff for the publication workflow.
     def staged_diff(
         self,
     ) -> str:
@@ -121,6 +132,7 @@ class SafeGitPublisher:
             ]
         )
 
+    # Purpose: Handle staged files for the publication workflow.
     def staged_files(
         self,
     ) -> list[str]:
@@ -136,6 +148,7 @@ class SafeGitPublisher:
             if line
         ]
 
+    # Purpose: Handle local branch exists for the publication workflow.
     def local_branch_exists(
         self,
         branch_name: str,
@@ -156,6 +169,7 @@ class SafeGitPublisher:
 
         return result.returncode == 0
 
+    # Purpose: Handle switch or create branch for the publication workflow.
     def switch_or_create_branch(
         self,
         branch_name: str,
@@ -179,6 +193,7 @@ class SafeGitPublisher:
             ]
         )
 
+    # Purpose: Stage files for the publication workflow.
     def stage_files(
         self,
         paths: list[str],
@@ -191,6 +206,7 @@ class SafeGitPublisher:
             ]
         )
 
+    # Purpose: Handle unstage files for the publication workflow.
     def unstage_files(
         self,
         paths: list[str],
@@ -206,6 +222,7 @@ class SafeGitPublisher:
             ]
         )
 
+    # Purpose: Handle commit for the publication workflow.
     def commit(
         self,
         *,
@@ -228,6 +245,7 @@ class SafeGitPublisher:
 
         return self.current_head()
 
+    # Purpose: Handle commit parent for the publication workflow.
     def commit_parent(
         self,
         commit_sha: str,
@@ -239,6 +257,7 @@ class SafeGitPublisher:
             ]
         ).strip()
 
+    # Purpose: Handle commit diff for the publication workflow.
     def commit_diff(
         self,
         *,
@@ -255,6 +274,7 @@ class SafeGitPublisher:
             ]
         )
 
+    # Purpose: Handle remote branch sha for the publication workflow.
     def remote_branch_sha(
         self,
         branch_name: str,
@@ -276,6 +296,7 @@ class SafeGitPublisher:
 
         return output.split()[0]
 
+    # Purpose: Handle push branch for the publication workflow.
     def push_branch(
         self,
         *,
@@ -296,6 +317,7 @@ class SafeGitPublisher:
                 str(exc)
             ) from exc
 
+    # Purpose: Handle remote config for the publication workflow.
     def remote_config(
         self,
     ) -> str:
@@ -307,6 +329,7 @@ class SafeGitPublisher:
         )
 
 
+# Purpose: Handle credential env for the publication workflow.
 @contextmanager
 def credential_env(
     credentials: GitHubCredentials | None,
@@ -327,6 +350,7 @@ def credential_env(
         yield env, (credentials.token,)
 
 
+# Purpose: Handle askpass script for the publication workflow.
 @contextmanager
 def askpass_script(
     credentials: GitHubCredentials,
@@ -366,6 +390,7 @@ def askpass_script(
             pass
 
 
+# Purpose: Sanitize error for the publication workflow.
 def sanitize_error(
     message: str,
     *,

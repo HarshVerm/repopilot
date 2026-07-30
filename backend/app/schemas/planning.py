@@ -1,3 +1,5 @@
+# Module purpose: Define validated planning API payload schemas.
+
 from typing import Any, Literal
 
 from pydantic import (
@@ -6,6 +8,7 @@ from pydantic import (
 )
 
 
+# Purpose: Validate and represent source reference data.
 class SourceReference(BaseModel):
     file_path: str = Field(
         min_length=1,
@@ -21,6 +24,7 @@ class SourceReference(BaseModel):
     )
 
 
+# Purpose: Validate and represent planned file data.
 class PlannedFile(BaseModel):
     path: str = Field(
         min_length=1,
@@ -37,6 +41,7 @@ class PlannedFile(BaseModel):
     references: list[SourceReference]
 
 
+# Purpose: Validate and represent implementation step data.
 class ImplementationStep(BaseModel):
     order: int = Field(
         ge=1,
@@ -48,6 +53,7 @@ class ImplementationStep(BaseModel):
     files: list[str]
 
 
+# Purpose: Validate and represent test plan item data.
 class TestPlanItem(BaseModel):
     description: str = Field(
         min_length=1,
@@ -59,6 +65,7 @@ class TestPlanItem(BaseModel):
     )
 
 
+# Purpose: Validate and represent planner output data.
 class PlannerOutput(BaseModel):
     summary: str = Field(
         min_length=1,
@@ -85,6 +92,7 @@ class PlannerOutput(BaseModel):
     missing_context: list[str]
 
 
+# Purpose: Validate and represent create plan request data.
 class CreatePlanRequest(BaseModel):
     owner: str = Field(
         min_length=1,
@@ -99,6 +107,7 @@ class CreatePlanRequest(BaseModel):
     )
 
 
+# Purpose: Validate and represent reject plan request data.
 class RejectPlanRequest(BaseModel):
     reason: str | None = Field(
         default=None,
@@ -106,6 +115,7 @@ class RejectPlanRequest(BaseModel):
     )
 
 
+# Purpose: Validate and represent planner execution metadata data.
 class PlannerExecutionMetadata(BaseModel):
     model: str | None = None
     latency_ms: float | None = None
@@ -115,6 +125,7 @@ class PlannerExecutionMetadata(BaseModel):
     trace_include_sensitive_data: bool
 
 
+# Purpose: Validate and represent plan response data.
 class PlanResponse(BaseModel):
     plan_id: str
     status: str
@@ -127,12 +138,14 @@ class PlanResponse(BaseModel):
     metadata: PlannerExecutionMetadata
 
 
+# Purpose: Validate and represent plan status response data.
 class PlanStatusResponse(BaseModel):
     plan_id: str
     status: str
     rejection_reason: str | None = None
 
 
+# Purpose: Validate and represent planning error response data.
 class PlanningErrorResponse(BaseModel):
     detail: str
     code: str

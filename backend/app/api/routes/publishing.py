@@ -1,3 +1,5 @@
+# Module purpose: Define publishing HTTP API routes.
+
 from uuid import UUID
 
 import httpx
@@ -54,6 +56,11 @@ from app.services.auth.service import (
     get_optional_auth_context,
     validate_csrf_tokens,
 )
+from app.services.auth.github_tokens import (
+    GitHubUserAuthorizationRequired,
+    GitHubUserAuthorizationUnavailable,
+    GitHubUserTokenService,
+)
 from app.api.routes.github import (
     resolve_user_repository,
 )
@@ -68,6 +75,9 @@ from app.services.github.permissions import (
 from app.services.github.installations import (
     installation_http_error,
 )
+from app.services.publishing.authentication import (
+    GitHubCredentials,
+)
 from app.observability.logging import (
     log_task_event,
 )
@@ -78,10 +88,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return publication service for the publication workflow.
 def get_publication_service() -> PublicationService:
     return PublicationService()
 
 
+# Purpose: Publish review for the publication workflow.
 @router.post(
     "/reviews/{review_id}/publish",
     response_model=PublicationResponse,
@@ -153,6 +165,7 @@ async def publish_review(
     )
 
 
+# Purpose: Return publication for the publication workflow.
 @router.get(
     "/publications/{publication_id}",
     response_model=PublicationResponse,
@@ -188,6 +201,7 @@ async def get_publication(
     )
 
 
+# Purpose: Return review publication for the publication workflow.
 @router.get(
     "/reviews/{review_id}/publication",
     response_model=PublicationResponse,
@@ -223,6 +237,7 @@ async def get_review_publication(
     )
 
 
+# Purpose: Publish task for the publication workflow.
 @router.post(
     "/tasks/{task_id}/publish",
     response_model=PublicationResponse,
@@ -301,6 +316,7 @@ async def publish_task(
     return serialize_publication(publication)
 
 
+# Purpose: Handle native publication context for the publication workflow.
 async def native_publication_context(
     *,
     task,
@@ -429,6 +445,38 @@ async def native_publication_context(
             app_permissions
         )
     )
+    try:
+        user_access_token = (
+            await GitHubUserTokenService().access_token(
+                user_id=auth.user.id,
+                db=db,
+            )
+        )
+    except GitHubUserAuthorizationRequired as exc:
+        raise auth_error(
+            status_code=409,
+            code="GITHUB_USER_AUTHORIZATION_REQUIRED",
+            message=(
+                "Reconnect your GitHub account before publishing "
+                "so the pull request is created as "
+                f"@{auth.user.github_login}."
+            ),
+            details={
+                "setup_path": (
+                    "/api/v1/auth/github/"
+                    "user-authorization/setup"
+                ),
+            },
+        ) from exc
+    except GitHubUserAuthorizationUnavailable as exc:
+        raise auth_error(
+            status_code=502,
+            code="GITHUB_USER_AUTHORIZATION_UNAVAILABLE",
+            message=(
+                "GitHub user authorization could not be refreshed. "
+                "Try publishing again."
+            ),
+        ) from exc
     await db.commit()
     log_task_event(
         "publication.authorization_verified",
@@ -443,6 +491,7 @@ async def native_publication_context(
             "contents:write",
             "pull_requests:write",
         ],
+        pull_request_actor=auth.user.github_login,
     )
     return {
         "github_installation_id": (
@@ -450,6 +499,13 @@ async def native_publication_context(
         ),
         "installation_id": installation.id,
         "repository_id": repository.id,
+        "pull_request_credentials": GitHubCredentials(
+            username="x-access-token",
+            token=user_access_token,
+        ),
+        "pull_request_actor_login": (
+            auth.user.github_login
+        ),
     }
 
 

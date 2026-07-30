@@ -1,3 +1,5 @@
+# Module purpose: Define reviews HTTP API routes.
+
 from uuid import UUID
 
 from fastapi import (
@@ -48,10 +50,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return review service for the final review workflow.
 def get_review_service() -> ReviewService:
     return ReviewService()
 
 
+# Purpose: Create final review for the final review workflow.
 @router.post(
     "/change-sets/{change_set_id}/review",
     response_model=FinalReviewResponse,
@@ -108,6 +112,7 @@ async def create_final_review(
     )
 
 
+# Purpose: Return final review for the final review workflow.
 @router.get(
     "/reviews/{review_id}",
     response_model=FinalReviewResponse,
@@ -143,6 +148,7 @@ async def get_final_review(
     )
 
 
+# Purpose: Approve final review for the final review workflow.
 @router.post(
     "/reviews/{review_id}/approve",
     response_model=ReviewDecisionResponse,
@@ -204,6 +210,7 @@ async def approve_final_review(
     )
 
 
+# Purpose: Reject final review for the final review workflow.
 @router.post(
     "/reviews/{review_id}/reject",
     response_model=ReviewDecisionResponse,
@@ -265,6 +272,7 @@ async def reject_final_review(
     )
 
 
+# Purpose: Approve task review for the final review workflow.
 @router.post(
     "/tasks/{task_id}/review/approve",
     response_model=ReviewDecisionResponse,
@@ -325,6 +333,7 @@ async def approve_task_review(
     return serialize_review_decision(result)
 
 
+# Purpose: Request task review changes for the final review workflow.
 @router.post(
     "/tasks/{task_id}/review/request-changes",
     response_model=ReviewDecisionResponse,
@@ -381,10 +390,12 @@ async def request_task_review_changes(
         run_revision_background,
         str(task.id),
         str(review.change_set_id),
+        result.feedback or payload.feedback,
     )
     return serialize_review_decision(result)
 
 
+# Purpose: Reject task review for the final review workflow.
 @router.post(
     "/tasks/{task_id}/review/reject",
     response_model=ReviewDecisionResponse,

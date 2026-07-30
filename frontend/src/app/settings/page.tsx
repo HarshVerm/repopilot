@@ -1,6 +1,9 @@
+// Module purpose: Render the settings application route.
+
 import { Suspense } from "react";
 import { SettingsView } from "@/components/settings/settings-view";
 
+/** Purpose: Render the settings page interface. */
 export default function SettingsPage() {
   return (
     <Suspense

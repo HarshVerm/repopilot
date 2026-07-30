@@ -1,3 +1,5 @@
+# Module purpose: Define retrieval HTTP API routes.
+
 from uuid import UUID
 
 from fastapi import (
@@ -40,10 +42,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return embedding client for the retrieval workflow.
 def get_embedding_client():
     return OpenAIEmbeddingClient()
 
 
+# Purpose: Build retrieval for the retrieval workflow.
 @router.post(
     "/{workspace_id}/build",
     response_model=RetrievalBuildResponse,
@@ -98,6 +102,7 @@ async def build_retrieval(
     }
 
 
+# Purpose: Handle search retrieval for the retrieval workflow.
 @router.post(
     "/{workspace_id}/search",
     response_model=RetrievalSearchResponse,

@@ -1,3 +1,5 @@
+# Module purpose: Expose the coder package.
+
 from app.agents.coder.agent import (
     AgentsCoderRunner,
     CoderRunResult,

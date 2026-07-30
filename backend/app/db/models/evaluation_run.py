@@ -1,3 +1,5 @@
+# Module purpose: Define persistent evaluation run database models.
+
 import uuid
 from datetime import datetime
 
@@ -31,6 +33,7 @@ EVALUATION_RUN_STATUSES = (
 )
 
 
+# Purpose: Persist evaluation run records.
 class EvaluationRun(Base):
     __tablename__ = "evaluation_runs"
 

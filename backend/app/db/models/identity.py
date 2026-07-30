@@ -1,3 +1,5 @@
+# Module purpose: Define persistent identity database models.
+
 import uuid
 from datetime import datetime
 
@@ -20,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
 
+# Purpose: Persist user records.
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -74,6 +77,7 @@ class User(Base):
     )
 
 
+# Purpose: Persist user session records.
 class UserSession(Base):
     __tablename__ = "user_sessions"
     __table_args__ = (
@@ -118,6 +122,79 @@ class UserSession(Base):
     )
 
 
+# Purpose: Persist git hub user authorization records.
+class GitHubUserAuthorization(Base):
+    __tablename__ = "github_user_authorizations"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('active', 'reauthorization_required', 'revoked')",
+            name="ck_github_user_authorizations_status",
+        ),
+        UniqueConstraint(
+            "user_id",
+            name="uq_github_user_authorizations_user_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    access_token_ciphertext: Mapped[str] = mapped_column(
+        Text,
+    )
+    access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    refresh_token_ciphertext: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    token_type: Mapped[str] = mapped_column(
+        String(30),
+        default="bearer",
+    )
+    status: Mapped[str] = mapped_column(
+        String(30),
+        default="active",
+        index=True,
+    )
+    authorized_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+# Purpose: Persist o auth state records.
 class OAuthState(Base):
     __tablename__ = "oauth_states"
     __table_args__ = (
@@ -169,6 +246,7 @@ class OAuthState(Base):
     )
 
 
+# Purpose: Persist git hub installation records.
 class GitHubInstallation(Base):
     __tablename__ = "github_installations"
     __table_args__ = (
@@ -235,6 +313,7 @@ class GitHubInstallation(Base):
     )
 
 
+# Purpose: Persist repository records.
 class Repository(Base):
     __tablename__ = "repositories"
     __table_args__ = (

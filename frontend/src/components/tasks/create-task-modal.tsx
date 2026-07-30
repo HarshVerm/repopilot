@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the create task modal interface.
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -23,6 +25,7 @@ import { createTask } from "@/lib/api/tasks";
 import { queryKeys } from "@/lib/query-client";
 import { ErrorState } from "@/components/shared/error-state";
 
+/** Purpose: Provide the debounced value React behavior. */
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -32,6 +35,7 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debounced;
 }
 
+/** Purpose: Render the create task modal interface. */
 export function CreateTaskModal({
   open,
   onClose,
@@ -404,6 +408,7 @@ export function CreateTaskModal({
   );
 }
 
+/** Purpose: Render the selector interface. */
 function Selector({
   search,
   onSearch,
@@ -433,6 +438,7 @@ function Selector({
   );
 }
 
+/** Purpose: Render the pagination interface. */
 function Pagination({
   page,
   hasNext,
@@ -452,10 +458,12 @@ function Pagination({
   );
 }
 
+/** Purpose: Render the loading rows interface. */
 function LoadingRows() {
   return <p className="p-6 text-center text-sm text-zinc-500">Loading from GitHub...</p>;
 }
 
+/** Purpose: Handle issue understanding for this frontend module. */
 function issueUnderstanding(title: string, body: string | null): [string, string][] {
   return [
     ["Problem", title],

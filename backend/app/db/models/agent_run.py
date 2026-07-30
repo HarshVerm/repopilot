@@ -1,3 +1,5 @@
+# Module purpose: Define persistent agent run database models.
+
 import uuid
 from datetime import datetime
 
@@ -22,6 +24,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist agent run records.
 class AgentRun(Base):
     __tablename__ = "agent_runs"
 

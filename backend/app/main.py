@@ -1,3 +1,5 @@
+# Module purpose: Create and configure the FastAPI application.
+
 from fastapi import (
     FastAPI,
     Request,
@@ -56,6 +58,7 @@ app.include_router(api_router)
 app.include_router(readiness_router)
 
 
+# Purpose: Add correlation id for the main workflow.
 @app.middleware("http")
 async def add_correlation_id(
     request: Request,
@@ -81,6 +84,7 @@ async def add_correlation_id(
         return response
 
 
+# Purpose: Report current main readiness.
 @app.get("/health")
 async def health():
     return {

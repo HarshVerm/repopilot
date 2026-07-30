@@ -1,3 +1,5 @@
+"""Create Tree-sitter syntax trees for languages with AST support."""
+
 from tree_sitter import Language, Parser
 
 import tree_sitter_javascript as tsjavascript
@@ -33,6 +35,7 @@ LANGUAGES = {
 def supports_ast_parsing(
     language_name: str,
 ) -> bool:
+    """Report whether RepoPilot has a Tree-sitter grammar for a language."""
     return language_name in LANGUAGES
 
 
@@ -40,6 +43,7 @@ def parse_source(
     language_name: str,
     source: bytes,
 ):
+    """Parse source bytes into a Tree-sitter tree for symbol extraction."""
     language = LANGUAGES.get(
         language_name
     )

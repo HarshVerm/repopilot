@@ -1,3 +1,5 @@
+// Module purpose: Provide reusable diff frontend utilities.
+
 export type DiffLineType = "context" | "added" | "removed" | "meta";
 
 export interface ParsedDiffLine {
@@ -16,10 +18,12 @@ export interface ParsedDiffFile {
   lines: ParsedDiffLine[];
 }
 
+/** Purpose: Normalize path for this frontend workflow. */
 function normalizePath(path: string) {
   return path.replace(/^a\//, "").replace(/^b\//, "");
 }
 
+/** Purpose: Parse hunk header for this frontend workflow. */
 function parseHunkHeader(line: string) {
   const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
   if (!match) {
@@ -32,6 +36,7 @@ function parseHunkHeader(line: string) {
   };
 }
 
+/** Purpose: Parse unified diff for this frontend workflow. */
 export function parseUnifiedDiff(diff: string | null | undefined): ParsedDiffFile[] {
   if (!diff?.trim()) {
     return [];

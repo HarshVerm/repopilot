@@ -1,3 +1,5 @@
+# Module purpose: Define plans HTTP API routes.
+
 import time
 from uuid import UUID
 
@@ -75,10 +77,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return github client for the HTTP API workflow.
 def get_github_client():
     return github_client
 
 
+# Purpose: Return planner runner for the HTTP API workflow.
 def get_planner_runner():
     return AgentsPlannerRunner()
 
@@ -91,6 +95,7 @@ PRE_PLAN_TASK_STATES = {
 }
 
 
+# Purpose: Create workspace plan for the HTTP API workflow.
 @router.post(
     "/workspaces/{workspace_id}/plan",
     response_model=PlanResponse,
@@ -336,6 +341,7 @@ async def create_workspace_plan(
     return serialize_plan(plan)
 
 
+# Purpose: Return plan for the HTTP API workflow.
 @router.get(
     "/plans/{plan_id}",
     response_model=PlanResponse,
@@ -366,6 +372,7 @@ async def get_plan(
     return serialize_plan(plan)
 
 
+# Purpose: Approve plan for the HTTP API workflow.
 @router.post(
     "/plans/{plan_id}/approve",
     response_model=PlanStatusResponse,
@@ -417,6 +424,7 @@ async def approve_plan(
     )
 
 
+# Purpose: Reject plan for the HTTP API workflow.
 @router.post(
     "/plans/{plan_id}/reject",
     response_model=PlanStatusResponse,

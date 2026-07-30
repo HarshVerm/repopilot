@@ -1,3 +1,5 @@
+# Module purpose: Define persistent change set database models.
+
 import uuid
 from datetime import datetime
 
@@ -24,6 +26,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist change set records.
 class ChangeSet(Base):
     __tablename__ = "change_sets"
 
@@ -198,6 +201,7 @@ class ChangeSet(Base):
     )
 
 
+# Purpose: Persist change set file records.
 class ChangeSetFile(Base):
     __tablename__ = "change_set_files"
 

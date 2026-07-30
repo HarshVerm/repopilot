@@ -1,3 +1,5 @@
+# Module purpose: Implement dataset behavior for the evaluation domain.
+
 import hashlib
 import json
 import os
@@ -20,10 +22,12 @@ HIDDEN_TESTS_ROOT = EVALS_ROOT / "hidden_tests"
 REPORTS_ROOT = EVALS_ROOT / "reports"
 
 
+# Purpose: Signal evaluation dataset failures.
 class EvaluationDatasetError(ValueError):
     pass
 
 
+# Purpose: Encapsulate evaluation suite behavior for the evaluation domain.
 @dataclass(frozen=True)
 class EvaluationSuite:
     suite_name: str
@@ -31,6 +35,7 @@ class EvaluationSuite:
     tasks: tuple[EvaluationTask, ...]
     root: Path = EVALS_ROOT
 
+    # Purpose: Handle filtered for the evaluation workflow.
     def filtered(
         self,
         *,
@@ -69,6 +74,7 @@ class EvaluationSuite:
             root=self.root,
         )
 
+    # Purpose: Validate evaluation for the evaluation workflow.
     def validate(
         self,
         *,
@@ -147,18 +153,21 @@ class EvaluationSuite:
                 hidden_path
             )
 
+    # Purpose: Handle fixture path for the evaluation workflow.
     def fixture_path(
         self,
         task: EvaluationTask,
     ) -> Path:
         return self.root / task.fixture_path
 
+    # Purpose: Handle hidden test path for the evaluation workflow.
     def hidden_test_path(
         self,
         task: EvaluationTask,
     ) -> Path:
         return self.root / task.hidden_test_path
 
+    # Purpose: Handle difficulty distribution for the evaluation workflow.
     def difficulty_distribution(
         self,
     ) -> dict[str, int]:
@@ -167,6 +176,7 @@ class EvaluationSuite:
             for task in self.tasks
         )
 
+    # Purpose: Handle category distribution for the evaluation workflow.
     def category_distribution(
         self,
     ) -> dict[str, int]:
@@ -176,6 +186,7 @@ class EvaluationSuite:
         )
 
 
+# Purpose: Load evaluation suite for the evaluation workflow.
 def load_evaluation_suite(
     suite_version: str = settings.evaluation_suite_version,
     *,
@@ -206,6 +217,7 @@ def load_evaluation_suite(
     return suite
 
 
+# Purpose: Handle fixture content hash for the evaluation workflow.
 def fixture_content_hash(
     fixture_path: Path,
 ) -> str:
@@ -234,6 +246,7 @@ def fixture_content_hash(
     return digest.hexdigest()
 
 
+# Purpose: Prepare fixture workspace for the evaluation workflow.
 def prepare_fixture_workspace(
     *,
     suite: EvaluationSuite,
@@ -294,6 +307,7 @@ def prepare_fixture_workspace(
     return workspace_path
 
 
+# Purpose: Handle deterministic fixture base sha for the evaluation workflow.
 def deterministic_fixture_base_sha(
     fixture_path: Path,
 ) -> str:
@@ -320,6 +334,7 @@ def deterministic_fixture_base_sha(
         )
 
 
+# Purpose: Handle initialize fixture git repo for the evaluation workflow.
 def initialize_fixture_git_repo(
     repository_path: Path,
 ) -> None:
@@ -364,6 +379,7 @@ def initialize_fixture_git_repo(
     )
 
 
+# Purpose: Run git for the evaluation workflow.
 def run_git(
     repository_path: Path,
     args: list[str],
@@ -404,6 +420,7 @@ def run_git(
     return result.stdout
 
 
+# Purpose: Handle git head for the evaluation workflow.
 def git_head(
     repository_path: Path,
 ) -> str:
@@ -416,6 +433,7 @@ def git_head(
     ).strip()
 
 
+# Purpose: Validate hidden asset for the evaluation workflow.
 def validate_hidden_asset(
     hidden_path: Path,
 ) -> None:
@@ -437,6 +455,7 @@ def validate_hidden_asset(
         )
 
 
+# Purpose: Handle distribution for the evaluation workflow.
 def distribution(
     values,
 ) -> dict[str, int]:
@@ -451,6 +470,7 @@ def distribution(
     return counts
 
 
+# Purpose: Return whether relative to.
 def is_relative_to(
     path: Path,
     parent: Path,

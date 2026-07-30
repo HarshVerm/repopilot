@@ -1,3 +1,6 @@
+// Module purpose: Render and coordinate the loading state interface.
+
+/** Purpose: Render the loading state interface. */
 export function LoadingState({
   title = "Loading",
   rows = 4,

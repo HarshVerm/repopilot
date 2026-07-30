@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task metrics interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { Shield, Timer, Zap } from "lucide-react";
 import type { ReactNode } from "react";
@@ -11,6 +13,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 
+/** Purpose: Render the task metrics interface. */
 export function TaskMetrics({ task }: { task: TaskResponse }) {
   const query = useQuery({
     queryKey: queryKeys.taskMetrics(task.task_id),
@@ -52,10 +55,12 @@ export function TaskMetrics({ task }: { task: TaskResponse }) {
   );
 }
 
+/** Purpose: Format ms for this frontend workflow. */
 function formatMs(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}ms` : "—";
 }
 
+/** Purpose: Render the metric card interface. */
 function MetricCard({
   icon,
   label,

@@ -1,3 +1,5 @@
+# Module purpose: Implement evaluator behavior for the evaluation domain.
+
 import json
 import uuid
 from dataclasses import dataclass
@@ -24,10 +26,12 @@ from app.services.tasks.service import (
 )
 
 
+# Purpose: Signal evaluation mode failures.
 class EvaluationModeError(PermissionError):
     pass
 
 
+# Purpose: Represent evaluation context data.
 @dataclass(frozen=True)
 class EvaluationContext:
     evaluation_run_id: str
@@ -35,7 +39,9 @@ class EvaluationContext:
     enabled: bool
 
 
+# Purpose: Encapsulate eval approval policy behavior for the evaluation domain.
 class EvalApprovalPolicy:
+    # Purpose: Ensure enabled for the evaluation workflow.
     def ensure_enabled(
         self,
         context: EvaluationContext,
@@ -45,6 +51,7 @@ class EvalApprovalPolicy:
                 "evaluation auto-approval requires EVALUATION_MODE=true and an explicit evaluation context"
             )
 
+    # Purpose: Approve plan for the evaluation workflow.
     async def approve_plan(
         self,
         *,
@@ -75,6 +82,7 @@ class EvalApprovalPolicy:
 
         return approved
 
+    # Purpose: Approve review for the evaluation workflow.
     async def approve_review(
         self,
         *,
@@ -108,11 +116,13 @@ class EvalApprovalPolicy:
         return approved
 
 
+# Purpose: Validate and represent hidden test file data.
 class HiddenTestFile(BaseModel):
     path: str
     content: str
 
 
+# Purpose: Validate and represent hidden test command data.
 class HiddenTestCommand(BaseModel):
     name: str
     command_type: str = "test"
@@ -123,17 +133,21 @@ class HiddenTestCommand(BaseModel):
     runtime: str = "python"
 
 
+# Purpose: Validate and represent hidden test manifest data.
 class HiddenTestManifest(BaseModel):
     files: list[HiddenTestFile]
     commands: list[HiddenTestCommand]
 
 
+# Purpose: Validate and represent hidden test result data.
 class HiddenTestResult(BaseModel):
     status: str
     results: list[dict]
 
 
+# Purpose: Encapsulate hidden test runner behavior for the evaluation domain.
 class HiddenTestRunner:
+    # Purpose: Initialize hidden test runner state and dependencies.
     def __init__(
         self,
         *,
@@ -141,6 +155,7 @@ class HiddenTestRunner:
     ) -> None:
         self.sandbox = sandbox or DockerSandbox()
 
+    # Purpose: Run evaluation for the evaluation workflow.
     def run(
         self,
         *,
@@ -185,6 +200,7 @@ class HiddenTestRunner:
             )
 
 
+# Purpose: Load hidden manifest for the evaluation workflow.
 def load_hidden_manifest(
     hidden_test_path: Path,
 ) -> HiddenTestManifest:
@@ -197,6 +213,7 @@ def load_hidden_manifest(
         )
 
 
+# Purpose: Write hidden files for the evaluation workflow.
 def write_hidden_files(
     repository_path: Path,
     files: list[HiddenTestFile],
@@ -244,6 +261,7 @@ def write_hidden_files(
         )
 
 
+# Purpose: Handle execution command for the evaluation workflow.
 def execution_command(
     command: HiddenTestCommand,
 ) -> ExecutionCommand:
@@ -260,6 +278,7 @@ def execution_command(
     )
 
 
+# Purpose: Handle hidden command args for the evaluation workflow.
 def hidden_command_args(
     command: HiddenTestCommand,
 ) -> list[str]:

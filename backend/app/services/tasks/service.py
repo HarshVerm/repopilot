@@ -1,3 +1,5 @@
+# Module purpose: Implement service behavior for the task lifecycle domain.
+
 import re
 import uuid
 from datetime import UTC, datetime
@@ -55,15 +57,19 @@ SLUG_RE = re.compile(
 )
 
 
+# Purpose: Signal task validation failures.
 class TaskValidationError(ValueError):
     pass
 
 
+# Purpose: Signal task not found failures.
 class TaskNotFoundError(KeyError):
     pass
 
 
+# Purpose: Coordinate task operations.
 class TaskService:
+    # Purpose: Initialize task service state and dependencies.
     def __init__(
         self,
         *,
@@ -73,6 +79,7 @@ class TaskService:
             state_machine or TaskStateMachine()
         )
 
+    # Purpose: Create task for the task lifecycle workflow.
     async def create_task(
         self,
         *,
@@ -240,6 +247,7 @@ class TaskService:
         await db.refresh(task)
         return task
 
+    # Purpose: List tasks for the task lifecycle workflow.
     async def list_tasks(
         self,
         *,
@@ -288,6 +296,7 @@ class TaskService:
         result = await db.scalars(stmt)
         return list(result)
 
+    # Purpose: Return task for the task lifecycle workflow.
     async def get_task(
         self,
         *,
@@ -299,6 +308,7 @@ class TaskService:
             task_id,
         )
 
+    # Purpose: Return user task for the task lifecycle workflow.
     async def get_user_task(
         self,
         *,
@@ -317,6 +327,7 @@ class TaskService:
             )
         )
 
+    # Purpose: Require task, raising an error when unavailable.
     async def require_task(
         self,
         *,
@@ -335,6 +346,7 @@ class TaskService:
 
         return task
 
+    # Purpose: Find active task for the task lifecycle workflow.
     async def find_active_task(
         self,
         *,
@@ -374,6 +386,7 @@ class TaskService:
         )
         return result.first()
 
+    # Purpose: Find task by workspace for the task lifecycle workflow.
     async def find_task_by_workspace(
         self,
         *,
@@ -396,6 +409,7 @@ class TaskService:
         )
         return result.first()
 
+    # Purpose: Handle task for plan for the task lifecycle workflow.
     async def task_for_plan(
         self,
         *,
@@ -415,6 +429,7 @@ class TaskService:
             db=db,
         )
 
+    # Purpose: Attach workspace for the task lifecycle workflow.
     async def attach_workspace(
         self,
         *,
@@ -484,6 +499,7 @@ class TaskService:
 
         return task
 
+    # Purpose: Transition task for the task lifecycle workflow.
     async def transition_task(
         self,
         *,
@@ -649,6 +665,7 @@ class TaskService:
         await db.refresh(task)
         return task
 
+    # Purpose: Set failure for the task lifecycle workflow.
     async def set_failure(
         self,
         *,
@@ -703,6 +720,7 @@ class TaskService:
             message=message,
         )
 
+    # Purpose: Request cancel for the task lifecycle workflow.
     async def request_cancel(
         self,
         *,
@@ -729,6 +747,7 @@ class TaskService:
             failure_category="cancelled",
         )
 
+    # Purpose: Start agent run for the task lifecycle workflow.
     async def start_agent_run(
         self,
         *,
@@ -769,6 +788,7 @@ class TaskService:
         await db.refresh(agent_run)
         return agent_run
 
+    # Purpose: Handle complete agent run for the task lifecycle workflow.
     async def complete_agent_run(
         self,
         *,
@@ -864,6 +884,7 @@ class TaskService:
         await db.refresh(agent_run)
         return agent_run
 
+    # Purpose: Record event for the task lifecycle workflow.
     async def record_event(
         self,
         *,
@@ -898,6 +919,7 @@ class TaskService:
 
         return event
 
+    # Purpose: Add event for the task lifecycle workflow.
     def add_event(
         self,
         *,
@@ -948,6 +970,7 @@ class TaskService:
         return event
 
 
+# Purpose: Validate task identity for the task lifecycle workflow.
 def validate_task_identity(
     *,
     owner: str,
@@ -968,6 +991,7 @@ def validate_task_identity(
         )
 
 
+# Purpose: Handle isoformat for the task lifecycle workflow.
 def isoformat(
     value,
 ) -> str | None:
@@ -977,6 +1001,7 @@ def isoformat(
     return value.isoformat()
 
 
+# Purpose: Parse github datetime for the task lifecycle workflow.
 def parse_github_datetime(
     value: str | datetime | None,
 ) -> datetime | None:
@@ -987,6 +1012,7 @@ def parse_github_datetime(
     )
 
 
+# Purpose: Serialize task for the task lifecycle workflow.
 def serialize_task(
     task: RepoPilotTask,
     *,
@@ -1075,6 +1101,7 @@ def serialize_task(
     }
 
 
+# Purpose: Serialize timeline event for the task lifecycle workflow.
 def serialize_timeline_event(
     event: TaskEvent,
 ) -> dict[str, Any]:
@@ -1123,6 +1150,7 @@ def task_issue_snapshot(task: RepoPilotTask) -> dict:
     }
 
 
+# Purpose: Serialize agent run for the task lifecycle workflow.
 def serialize_agent_run(
     agent_run: AgentRun,
 ) -> dict[str, Any]:

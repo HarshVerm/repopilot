@@ -1,9 +1,12 @@
 "use client";
 
+// Module purpose: Render and coordinate the login view interface.
+
 import { AlertTriangle, Github, Terminal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { githubLoginUrl } from "@/lib/api/auth";
 
+/** Purpose: Render the login view interface. */
 export function LoginView() {
   const searchParams = useSearchParams();
   const authNotConfigured =

@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the final review interface.
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileCheck2 } from "lucide-react";
 import { useState } from "react";
@@ -25,6 +27,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { DiffViewer } from "@/components/changes/diff-viewer";
 import { PublicationResult } from "@/components/publication/publication-result";
 
+/** Purpose: Render the final review interface. */
 export function FinalReview({ task }: { task: TaskResponse }) {
   const queryClient = useQueryClient();
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -64,6 +67,7 @@ export function FinalReview({ task }: { task: TaskResponse }) {
 
   const publication = publicationByIdQuery.data ?? reviewPublicationQuery.data ?? null;
 
+  /** Purpose: Invalidate review state for this frontend workflow. */
   const invalidateReviewState = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.task(task.task_id) }),
@@ -124,6 +128,7 @@ export function FinalReview({ task }: { task: TaskResponse }) {
     },
     onError: async (error) => {
       if (isApiError(error) && error.status === 409) {
+        setChangesOpen(false);
         setStaleReviewNotice(error.message);
         await invalidateReviewState();
       }
@@ -290,7 +295,11 @@ export function FinalReview({ task }: { task: TaskResponse }) {
             </button>
             <button
               type="button"
-              onClick={() => setChangesOpen(true)}
+              onClick={() => {
+                requestChangesMutation.reset();
+                setStaleReviewNotice(null);
+                setChangesOpen(true);
+              }}
               disabled={
                 approveMutation.isPending ||
                 rejectMutation.isPending ||
@@ -332,20 +341,29 @@ export function FinalReview({ task }: { task: TaskResponse }) {
         description="Describe the revision RepoPilot should make. The current review will be invalidated and a new verified revision will run."
         confirmLabel="Send Feedback"
         pending={requestChangesMutation.isPending}
+        error={
+          requestChangesMutation.isError && !staleReviewNotice
+            ? requestChangesMutation.error instanceof Error
+              ? requestChangesMutation.error.message
+              : "RepoPilot could not request changes."
+            : undefined
+        }
         reason={changeFeedback}
+        reasonLabel="Revision feedback"
+        reasonPlaceholder="Describe exactly what RepoPilot should change"
+        reasonRequired
         onReasonChange={setChangeFeedback}
-        onCancel={() => setChangesOpen(false)}
-        onConfirm={() => {
-          if (changeFeedback.trim()) requestChangesMutation.mutate();
+        onCancel={() => {
+          requestChangesMutation.reset();
+          setChangesOpen(false);
         }}
+        onConfirm={() => requestChangesMutation.mutate()}
       />
-      {requestChangesMutation.isError && !staleReviewNotice ? (
-        <ErrorState error={requestChangesMutation.error} />
-      ) : null}
     </div>
   );
 }
 
+/** Purpose: Handle review integrity for this frontend module. */
 function reviewIntegrity(task: TaskResponse, review: FinalReviewResponse) {
   return {
     review_id: review.review_id,
@@ -354,6 +372,7 @@ function reviewIntegrity(task: TaskResponse, review: FinalReviewResponse) {
   };
 }
 
+/** Purpose: Render the pair interface. */
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">

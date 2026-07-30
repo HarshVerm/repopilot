@@ -1,3 +1,5 @@
+# Module purpose: Implement manager behavior for the sandbox execution domain.
+
 import time
 import uuid
 from datetime import UTC, datetime
@@ -71,9 +73,11 @@ from app.services.tasks.state_machine import (
 )
 
 
+# Purpose: Define the interface required from sandbox runtime implementations.
 class SandboxRuntime(Protocol):
     runtime_name: str
 
+    # Purpose: Prepare sandbox execution for the sandbox execution workflow.
     def prepare(
         self,
         *,
@@ -82,6 +86,7 @@ class SandboxRuntime(Protocol):
     ) -> SandboxHandle:
         ...
 
+    # Purpose: Execute sandbox execution for the sandbox execution workflow.
     def execute(
         self,
         *,
@@ -90,6 +95,7 @@ class SandboxRuntime(Protocol):
     ) -> CommandResult:
         ...
 
+    # Purpose: Clean up sandbox execution for the sandbox execution workflow.
     def cleanup(
         self,
         handle: SandboxHandle | None,
@@ -97,7 +103,9 @@ class SandboxRuntime(Protocol):
         ...
 
 
+# Purpose: Coordinate execution operations.
 class ExecutionService:
+    # Purpose: Initialize execution service state and dependencies.
     def __init__(
         self,
         *,
@@ -105,6 +113,7 @@ class ExecutionService:
     ) -> None:
         self.sandbox = sandbox or DockerSandbox()
 
+    # Purpose: Return execution run for the sandbox execution workflow.
     async def get_execution_run(
         self,
         *,
@@ -116,6 +125,7 @@ class ExecutionService:
             execution_run_id,
         )
 
+    # Purpose: Execute change set for the sandbox execution workflow.
     async def execute_change_set(
         self,
         *,
@@ -356,6 +366,7 @@ class ExecutionService:
                     db=db,
                 )
 
+    # Purpose: Run commands for the sandbox execution workflow.
     def run_commands(
         self,
         *,
@@ -424,6 +435,7 @@ class ExecutionService:
         return results
 
 
+# Purpose: Transition task for execution run for the sandbox execution workflow.
 async def transition_task_for_execution_run(
     *,
     task_service: TaskService,
@@ -467,6 +479,7 @@ async def transition_task_for_execution_run(
     )
 
 
+# Purpose: Handle execution task metadata for the sandbox execution workflow.
 def execution_task_metadata(
     run: ExecutionRun,
 ) -> dict:
@@ -495,6 +508,7 @@ def execution_task_metadata(
     }
 
 
+# Purpose: Return whether stop after result.
 def should_stop_after_result(
     result: CommandResult,
 ) -> bool:
@@ -513,6 +527,7 @@ def should_stop_after_result(
     )
 
 
+# Purpose: Handle skip remaining for the sandbox execution workflow.
 def skip_remaining(
     commands: list[ExecutionCommand],
     reason: str,
@@ -529,6 +544,7 @@ def skip_remaining(
     ]
 
 
+# Purpose: Handle overall timeout exceeded for the sandbox execution workflow.
 def overall_timeout_exceeded(
     started_at: float,
 ) -> bool:
@@ -537,6 +553,7 @@ def overall_timeout_exceeded(
     ) > settings.sandbox_overall_timeout_seconds
 
 
+# Purpose: Handle resource metadata for the sandbox execution workflow.
 def resource_metadata() -> dict:
     return {
         "cpu_limit": settings.sandbox_cpu_limit,
@@ -563,12 +580,14 @@ def resource_metadata() -> dict:
     }
 
 
+# Purpose: Sanitize error for the sandbox execution workflow.
 def sanitize_error(
     exc: Exception,
 ) -> str:
     return exc.__class__.__name__
 
 
+# Purpose: Serialize execution run for the sandbox execution workflow.
 def serialize_execution_run(
     run: ExecutionRun,
 ) -> dict:

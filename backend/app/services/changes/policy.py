@@ -1,3 +1,5 @@
+# Module purpose: Implement policy behavior for the change-set domain.
+
 from pathlib import Path
 
 from app.core.config import settings
@@ -10,6 +12,7 @@ from app.services.indexing.scanner import (
 )
 
 
+# Purpose: Signal path policy failures.
 class PathPolicyError(ValueError):
     pass
 
@@ -36,6 +39,7 @@ DEPENDENCY_FILENAMES = {
 }
 
 
+# Purpose: Return whether sensitive path.
 def is_sensitive_path(
     relative_path: Path,
 ) -> bool:
@@ -67,12 +71,14 @@ def is_sensitive_path(
     return False
 
 
+# Purpose: Return whether dependency manifest.
 def is_dependency_manifest(
     relative_path: Path,
 ) -> bool:
     return relative_path.name in DEPENDENCY_FILENAMES
 
 
+# Purpose: Validate editable path for the change-set workflow.
 def validate_editable_path(
     *,
     repository_path: Path,
@@ -133,6 +139,7 @@ def validate_editable_path(
     return resolved_path
 
 
+# Purpose: Validate creatable path for the change-set workflow.
 def validate_creatable_path(
     *,
     repository_path: Path,

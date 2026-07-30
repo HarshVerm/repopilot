@@ -1,3 +1,5 @@
+# Module purpose: Implement readiness behavior for the application hardening domain.
+
 import asyncio
 import subprocess
 from dataclasses import dataclass
@@ -16,13 +18,16 @@ from app.services.workspace.manager import (
 )
 
 
+# Purpose: Encapsulate readiness check behavior for the application hardening domain.
 @dataclass(frozen=True)
 class ReadinessCheck:
     status: str
     details: str | None = None
 
 
+# Purpose: Coordinate readiness operations.
 class ReadinessService:
+    # Purpose: Check application hardening for the application hardening workflow.
     async def check(
         self,
         *,
@@ -77,6 +82,7 @@ class ReadinessService:
             "checks": serialized,
         }
 
+    # Purpose: Check database for the application hardening workflow.
     async def check_database(
         self,
         db: AsyncSession,
@@ -95,6 +101,7 @@ class ReadinessService:
             status="ok"
         )
 
+    # Purpose: Check directory for the application hardening workflow.
     def check_directory(
         self,
         path: Path,
@@ -134,6 +141,7 @@ class ReadinessService:
             status="ok"
         )
 
+    # Purpose: Check configuration for the application hardening workflow.
     def check_configuration(
         self,
     ) -> ReadinessCheck:
@@ -149,6 +157,7 @@ class ReadinessService:
             status="ok"
         )
 
+    # Purpose: Check docker for the application hardening workflow.
     async def check_docker(
         self,
     ) -> ReadinessCheck:

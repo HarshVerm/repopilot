@@ -1,3 +1,5 @@
+# Module purpose: Implement orchestrator behavior for the debugging domain.
+
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -97,6 +99,7 @@ TERMINAL_NON_DEBUGGABLE_STATUSES = {
 }
 
 
+# Purpose: Represent debug workflow result data.
 @dataclass(frozen=True)
 class DebugWorkflowResult:
     status: str
@@ -106,7 +109,9 @@ class DebugWorkflowResult:
     final_execution_run_id: uuid.UUID | None
 
 
+# Purpose: Coordinate debug operations.
 class DebugOrchestrator:
+    # Purpose: Initialize debug orchestrator state and dependencies.
     def __init__(
         self,
         *,
@@ -122,6 +127,7 @@ class DebugOrchestrator:
             or ExecutionService()
         )
 
+    # Purpose: Return debug attempt for the debugging workflow.
     async def get_debug_attempt(
         self,
         *,
@@ -133,6 +139,7 @@ class DebugOrchestrator:
             debug_attempt_id,
         )
 
+    # Purpose: Handle debug execution run for the debugging workflow.
     async def debug_execution_run(
         self,
         *,
@@ -452,6 +459,7 @@ class DebugOrchestrator:
             db=db,
         )
 
+    # Purpose: Finalize task debug result for the debugging workflow.
     async def finalize_task_debug_result(
         self,
         *,
@@ -526,6 +534,7 @@ class DebugOrchestrator:
 
         return result
 
+    # Purpose: Run attempt for the debugging workflow.
     async def run_attempt(
         self,
         *,
@@ -813,6 +822,7 @@ class DebugOrchestrator:
             retry_execution_run=retry_execution_run,
         )
 
+    # Purpose: Create repair change set for the debugging workflow.
     def create_repair_change_set(
         self,
         *,
@@ -891,6 +901,7 @@ class DebugOrchestrator:
 
         return child
 
+    # Purpose: Create attempt for the debugging workflow.
     async def create_attempt(
         self,
         *,
@@ -934,6 +945,7 @@ class DebugOrchestrator:
 
         return attempt
 
+    # Purpose: Apply debugger metadata for the debugging workflow.
     def apply_debugger_metadata(
         self,
         attempt: DebugAttempt,
@@ -958,6 +970,7 @@ class DebugOrchestrator:
             run_result.total_tokens
         )
 
+    # Purpose: Stop attempt for the debugging workflow.
     async def stop_attempt(
         self,
         attempt: DebugAttempt,
@@ -978,6 +991,7 @@ class DebugOrchestrator:
         await db.commit()
         await db.refresh(attempt)
 
+    # Purpose: Load execution run for the debugging workflow.
     async def load_execution_run(
         self,
         execution_run_id: uuid.UUID,
@@ -995,6 +1009,7 @@ class DebugOrchestrator:
 
         return run
 
+    # Purpose: Load change set for the debugging workflow.
     async def load_change_set(
         self,
         change_set_id: uuid.UUID,
@@ -1016,6 +1031,7 @@ class DebugOrchestrator:
 
         return change_set
 
+    # Purpose: Load plan for the debugging workflow.
     async def load_plan(
         self,
         plan_id: uuid.UUID,
@@ -1034,12 +1050,14 @@ class DebugOrchestrator:
         return plan
 
 
+# Purpose: Represent attempt run result data.
 @dataclass(frozen=True)
 class AttemptRunResult:
     new_change_set: ChangeSet
     retry_execution_run: ExecutionRun
 
 
+# Purpose: Return whether untracked files.
 def has_untracked_files(
     repository_path: Path,
 ) -> bool:
@@ -1051,6 +1069,7 @@ def has_untracked_files(
     )
 
 
+# Purpose: Handle debug failure category for the debugging workflow.
 def debug_failure_category(
     reason: str | None,
 ) -> str:
@@ -1066,6 +1085,7 @@ def debug_failure_category(
     return DEBUGGER_ERROR
 
 
+# Purpose: Serialize debug attempt for the debugging workflow.
 def serialize_debug_attempt(
     attempt: DebugAttempt,
 ) -> dict:
@@ -1097,6 +1117,7 @@ def serialize_debug_attempt(
     }
 
 
+# Purpose: Serialize debug attempt detail for the debugging workflow.
 def serialize_debug_attempt_detail(
     attempt: DebugAttempt,
 ) -> dict:
@@ -1115,6 +1136,7 @@ def serialize_debug_attempt_detail(
     }
 
 
+# Purpose: Serialize debug workflow for the debugging workflow.
 def serialize_debug_workflow(
     result: DebugWorkflowResult,
 ) -> dict:

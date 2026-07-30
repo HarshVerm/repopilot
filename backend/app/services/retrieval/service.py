@@ -1,3 +1,5 @@
+"""Orchestrate code chunk indexing and hybrid RAG retrieval."""
+
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -47,6 +49,7 @@ SEMANTIC_K = 30
 def sanitize_retrieval_error(
     exc: Exception,
 ) -> str:
+    """Expose an error category without leaking provider response details."""
     return f"{exc.__class__.__name__}: semantic retrieval unavailable"
 
 
@@ -54,6 +57,7 @@ async def embed_chunk_texts(
     drafts,
     embedding_client: EmbeddingClient,
 ) -> tuple[list[list[float] | None], int, int]:
+    """Embed chunk drafts in batches and preserve gaps for failed batches."""
     embeddings: list[list[float] | None] = [
         None
         for _ in drafts
@@ -113,6 +117,7 @@ async def build_retrieval_index(
     db: AsyncSession,
     embedding_client: EmbeddingClient | None = None,
 ) -> dict:
+    """Rebuild persisted code chunks and embeddings for one workspace."""
     client = embedding_client or OpenAIEmbeddingClient()
 
     result = await db.execute(
@@ -231,6 +236,7 @@ async def hybrid_search(
     embedding_client: EmbeddingClient | None = None,
     debug: bool = False,
 ) -> dict:
+    """Run all retrievers, fuse rankings, and assemble agent-ready context."""
     client = embedding_client or OpenAIEmbeddingClient()
     stripped_query = query.strip()
     validate_retrieval_request(

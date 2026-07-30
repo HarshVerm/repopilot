@@ -1,3 +1,5 @@
+# Module purpose: Implement retries behavior for the application hardening domain.
+
 import asyncio
 import random
 from collections.abc import Awaitable, Callable
@@ -13,6 +15,7 @@ from app.core.config import settings
 T = TypeVar("T")
 
 
+# Purpose: Enumerate supported provider failure category values.
 class ProviderFailureCategory(StrEnum):
     RATE_LIMIT = "provider_rate_limit"
     TIMEOUT = "provider_timeout"
@@ -23,6 +26,7 @@ class ProviderFailureCategory(StrEnum):
     UNKNOWN = "provider_unknown_error"
 
 
+# Purpose: Encapsulate provider failure behavior for the application hardening domain.
 @dataclass(frozen=True)
 class ProviderFailure:
     category: ProviderFailureCategory
@@ -30,6 +34,7 @@ class ProviderFailure:
     status_code: int | None = None
 
 
+# Purpose: Encapsulate retry policy behavior for the application hardening domain.
 @dataclass(frozen=True)
 class RetryPolicy:
     max_attempts: int = settings.provider_max_retries
@@ -50,6 +55,7 @@ RETRYABLE_HTTP_STATUSES = {
 }
 
 
+# Purpose: Classify provider failure for the application hardening workflow.
 def classify_provider_failure(
     exc: Exception,
 ) -> ProviderFailure:
@@ -128,6 +134,7 @@ def classify_provider_failure(
     )
 
 
+# Purpose: Retry async for the application hardening workflow.
 async def retry_async(
     operation: Callable[[], Awaitable[T]],
     *,
@@ -169,6 +176,7 @@ async def retry_async(
     raise last_error
 
 
+# Purpose: Retry delay seconds for the application hardening workflow.
 def retry_delay_seconds(
     *,
     attempt: int,

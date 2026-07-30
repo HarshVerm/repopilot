@@ -1,3 +1,5 @@
+# Module purpose: Implement docker behavior for the sandbox execution domain.
+
 import subprocess
 import time
 import uuid
@@ -22,18 +24,22 @@ from app.services.sandbox.results import (
 )
 
 
+# Purpose: Signal sandbox preparation failures.
 class SandboxPreparationError(RuntimeError):
     pass
 
 
+# Purpose: Signal sandbox execution failures.
 class SandboxExecutionError(RuntimeError):
     pass
 
 
+# Purpose: Signal sandbox cleanup failures.
 class SandboxCleanupError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate sandbox handle behavior for the sandbox execution domain.
 @dataclass
 class SandboxHandle:
     execution_run_id: uuid.UUID
@@ -44,9 +50,11 @@ class SandboxHandle:
     )
 
 
+# Purpose: Encapsulate docker sandbox behavior for the sandbox execution domain.
 class DockerSandbox:
     runtime_name = "docker"
 
+    # Purpose: Initialize docker sandbox state and dependencies.
     def __init__(
         self,
         *,
@@ -54,6 +62,7 @@ class DockerSandbox:
     ) -> None:
         self.sandbox_root = sandbox_root
 
+    # Purpose: Prepare sandbox execution for the sandbox execution workflow.
     def prepare(
         self,
         *,
@@ -77,6 +86,7 @@ class DockerSandbox:
             repository_path=repository_path,
         )
 
+    # Purpose: Execute sandbox execution for the sandbox execution workflow.
     def execute(
         self,
         *,
@@ -165,6 +175,7 @@ class DockerSandbox:
             stderr=result.stderr,
         )
 
+    # Purpose: Clean up sandbox execution for the sandbox execution workflow.
     def cleanup(
         self,
         handle: SandboxHandle | None,
@@ -200,6 +211,7 @@ class DockerSandbox:
 
         return errors
 
+    # Purpose: Build docker run args for the sandbox execution workflow.
     def build_docker_run_args(
         self,
         *,
@@ -261,6 +273,7 @@ class DockerSandbox:
 
         return args
 
+    # Purpose: Handle image for command for the sandbox execution workflow.
     def image_for_command(
         self,
         command: ExecutionCommand,
@@ -270,6 +283,7 @@ class DockerSandbox:
 
         return settings.sandbox_node_image
 
+    # Purpose: Handle network for command for the sandbox execution workflow.
     def network_for_command(
         self,
         command: ExecutionCommand,
@@ -289,6 +303,7 @@ class DockerSandbox:
 
         return network
 
+    # Purpose: Remove container for the sandbox execution workflow.
     def remove_container(
         self,
         container_name: str,

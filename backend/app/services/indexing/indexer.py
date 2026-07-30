@@ -1,3 +1,5 @@
+"""Persist repository file metadata and AST symbols for later RAG stages."""
+
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -27,6 +29,7 @@ def file_failure(
     file_path: str,
     reason: str,
 ) -> dict[str, str]:
+    """Build the stable failure shape returned in indexing telemetry."""
     return {
         "file_path": file_path,
         "reason": reason,
@@ -38,6 +41,7 @@ async def index_repository(
     repository_path: Path,
     db: AsyncSession,
 ):
+    """Replace a workspace index with current files and extracted symbols."""
 
     source_files = scan_repository(
         repository_path

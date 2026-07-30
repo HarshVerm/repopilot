@@ -1,3 +1,5 @@
+# Module purpose: Implement redaction behavior for the observability domain.
+
 from collections.abc import Mapping
 import re
 from typing import Any
@@ -33,6 +35,7 @@ LONG_SECRET_RE = re.compile(
 )
 
 
+# Purpose: Return whether sensitive key.
 def is_sensitive_key(
     key: object,
 ) -> bool:
@@ -43,6 +46,7 @@ def is_sensitive_key(
     )
 
 
+# Purpose: Redact string for the observability workflow.
 def redact_string(
     value: str,
 ) -> str:
@@ -64,6 +68,7 @@ def redact_string(
     return redacted
 
 
+# Purpose: Redact observability for the observability workflow.
 def redact(
     value: Any,
     *,
@@ -143,6 +148,7 @@ def redact(
     )
 
 
+# Purpose: Handle bounded metadata for the observability workflow.
 def bounded_metadata(
     metadata: Mapping[str, Any] | None,
 ) -> dict[str, Any]:

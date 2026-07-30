@@ -1,3 +1,5 @@
+# Module purpose: Define execution HTTP API routes.
+
 from uuid import UUID
 
 from fastapi import (
@@ -44,10 +46,12 @@ router = APIRouter(
 )
 
 
+# Purpose: Return sandbox runtime for the HTTP API workflow.
 def get_sandbox_runtime():
     return DockerSandbox()
 
 
+# Purpose: Execute change set for the HTTP API workflow.
 @router.post(
     "/change-sets/{change_set_id}/execute",
     response_model=ExecutionRunResponse,
@@ -126,6 +130,7 @@ async def execute_change_set(
     )
 
 
+# Purpose: Return execution run for the HTTP API workflow.
 @router.get(
     "/execution-runs/{execution_run_id}",
     response_model=ExecutionRunResponse,

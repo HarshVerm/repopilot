@@ -1,3 +1,5 @@
+# Module purpose: Implement integrity behavior for the publication domain.
+
 from pathlib import Path
 
 from app.db.models.change_set import (
@@ -24,46 +26,57 @@ from app.services.reviews.service import (
 )
 
 
+# Purpose: Signal publication failures.
 class PublicationError(ValueError):
     pass
 
 
+# Purpose: Signal review not approved failures.
 class ReviewNotApprovedError(PublicationError):
     pass
 
 
+# Purpose: Signal publication integrity failures.
 class PublicationIntegrityError(PublicationError):
     pass
 
 
+# Purpose: Signal repository mismatch failures.
 class RepositoryMismatchError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal branch collision failures.
 class BranchCollisionError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal staged file mismatch failures.
 class StagedFileMismatchError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal staged diff mismatch failures.
 class StagedDiffMismatchError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal commit diff mismatch failures.
 class CommitDiffMismatchError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal commit parent mismatch failures.
 class CommitParentMismatchError(PublicationIntegrityError):
     pass
 
 
+# Purpose: Signal publication state failures.
 class PublicationStateError(PublicationError):
     pass
 
 
+# Purpose: Validate publishable review for the publication workflow.
 def validate_publishable_review(
     *,
     review: FinalReview,
@@ -98,6 +111,7 @@ def validate_publishable_review(
     )
 
 
+# Purpose: Validate review repository snapshot for the publication workflow.
 def validate_review_repository_snapshot(
     *,
     review: FinalReview,
@@ -118,6 +132,7 @@ def validate_review_repository_snapshot(
         )
 
 
+# Purpose: Handle reviewed file paths for the publication workflow.
 def reviewed_file_paths(
     review: FinalReview,
 ) -> list[str]:
@@ -162,6 +177,7 @@ def reviewed_file_paths(
     )
 
 
+# Purpose: Validate reviewed file path for the publication workflow.
 def validate_reviewed_file_path(
     path: str,
 ) -> str:
@@ -213,6 +229,7 @@ def validate_reviewed_file_path(
     return normalized
 
 
+# Purpose: Handle assert hash matches for the publication workflow.
 def assert_hash_matches(
     *,
     actual: str,

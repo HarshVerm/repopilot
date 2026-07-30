@@ -1,3 +1,5 @@
+// Module purpose: Provide typed API operations for client.
+
 export interface ApiErrorShape {
   status: number;
   message: string;
@@ -12,6 +14,7 @@ export class ApiRequestError extends Error implements ApiErrorShape {
   requestId?: string;
   details?: unknown;
 
+  /** Purpose: Initialize the class instance. */
   constructor(error: ApiErrorShape) {
     super(error.message);
     this.name = "ApiRequestError";
@@ -31,10 +34,12 @@ const explicitBaseUrl = process.env.NEXT_PUBLIC_REPOPILOT_API_URL?.replace(/\/$/
 const csrfCookieName =
   process.env.NEXT_PUBLIC_REPOPILOT_CSRF_COOKIE_NAME || "repopilot_csrf";
 
+/** Purpose: Handle api url for this frontend module. */
 export function apiUrl(path: string) {
   return buildUrl(path);
 }
 
+/** Purpose: Handle make request id for this frontend module. */
 function makeRequestId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -43,6 +48,7 @@ function makeRequestId() {
   return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** Purpose: Build url for this frontend workflow. */
 function buildUrl(path: string) {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
@@ -52,10 +58,12 @@ function buildUrl(path: string) {
   return explicitBaseUrl ? `${explicitBaseUrl}${normalizedPath}` : normalizedPath;
 }
 
+/** Purpose: Check whether json response for this frontend workflow. */
 function isJsonResponse(response: Response) {
   return response.headers.get("content-type")?.includes("application/json") ?? false;
 }
 
+/** Purpose: Parse response for this frontend workflow. */
 async function parseResponse(response: Response) {
   if (response.status === 204) {
     return null;
@@ -69,6 +77,7 @@ async function parseResponse(response: Response) {
   return text.length > 0 ? text : null;
 }
 
+/** Purpose: Handle message from details for this frontend module. */
 function messageFromDetails(details: unknown, fallback: string) {
   if (typeof details === "string") {
     return details;
@@ -97,6 +106,7 @@ function messageFromDetails(details: unknown, fallback: string) {
   return fallback;
 }
 
+/** Purpose: Handle api request for this frontend module. */
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
@@ -160,6 +170,7 @@ export async function apiRequest<T>(
   return parsed as T;
 }
 
+/** Purpose: Handle read cookie for this frontend module. */
 function readCookie(name: string) {
   if (typeof document === "undefined") {
     return null;
@@ -171,6 +182,7 @@ function readCookie(name: string) {
   return value ? decodeURIComponent(value.slice(prefix.length)) : null;
 }
 
+/** Purpose: Check whether api error for this frontend workflow. */
 export function isApiError(error: unknown): error is ApiRequestError {
   return error instanceof ApiRequestError;
 }

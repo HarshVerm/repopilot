@@ -1,3 +1,5 @@
+# Module purpose: Implement policy behavior for the debugging domain.
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,30 +26,37 @@ from app.services.debugging.fingerprint import (
 )
 
 
+# Purpose: Signal debug not eligible failures.
 class DebugNotEligibleError(ValueError):
     pass
 
 
+# Purpose: Signal plan revision required failures.
 class PlanRevisionRequiredError(ValueError):
     pass
 
 
+# Purpose: Signal debug patch validation failures.
 class DebugPatchValidationError(ValueError):
     pass
 
 
+# Purpose: Signal debug attempts exceeded failures.
 class DebugAttemptsExceededError(ValueError):
     pass
 
 
+# Purpose: Signal no progress failures.
 class NoProgressError(ValueError):
     pass
 
 
+# Purpose: Signal debugger execution failures.
 class DebuggerExecutionError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate workspace patch snapshot behavior for the debugging domain.
 @dataclass(frozen=True)
 class WorkspacePatchSnapshot:
     files: dict[str, bytes]
@@ -55,6 +64,7 @@ class WorkspacePatchSnapshot:
     diff_hash: str
 
 
+# Purpose: Handle approved files from plan for the debugging workflow.
 def approved_files_from_plan(
     plan: ExecutionPlan,
 ) -> set[str]:
@@ -63,6 +73,7 @@ def approved_files_from_plan(
     )
 
 
+# Purpose: Validate debugger scope for the debugging workflow.
 def validate_debugger_scope(
     *,
     output: DebuggerOutput,
@@ -84,6 +95,7 @@ def validate_debugger_scope(
         )
 
 
+# Purpose: Handle capture patch snapshot for the debugging workflow.
 def capture_patch_snapshot(
     repository_path: Path,
 ) -> WorkspacePatchSnapshot:
@@ -121,6 +133,7 @@ def capture_patch_snapshot(
     )
 
 
+# Purpose: Handle restore patch snapshot for the debugging workflow.
 def restore_patch_snapshot(
     *,
     repository_path: Path,

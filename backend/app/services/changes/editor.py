@@ -1,3 +1,5 @@
+# Module purpose: Implement editor behavior for the change-set domain.
+
 import os
 import uuid
 from pathlib import Path
@@ -10,11 +12,14 @@ from app.services.changes.policy import (
 )
 
 
+# Purpose: Signal patch security failures.
 class PatchSecurityError(ValueError):
     pass
 
 
+# Purpose: Encapsulate repo pilot patch editor behavior for the change-set domain.
 class RepoPilotPatchEditor:
+    # Purpose: Initialize repo pilot patch editor state and dependencies.
     def __init__(
         self,
         *,
@@ -49,6 +54,7 @@ class RepoPilotPatchEditor:
         self.operations_accepted = 0
         self.operations_rejected = 0
 
+    # Purpose: Validate path for the change-set workflow.
     def validate_path(
         self,
         path: str,
@@ -65,6 +71,7 @@ class RepoPilotPatchEditor:
                 str(exc)
             ) from exc
 
+    # Purpose: Validate create path for the change-set workflow.
     def validate_create_path(
         self,
         path: str,
@@ -80,6 +87,7 @@ class RepoPilotPatchEditor:
                 str(exc)
             ) from exc
 
+    # Purpose: Validate created path for the change-set workflow.
     def validate_created_path(
         self,
         path: str,
@@ -96,6 +104,7 @@ class RepoPilotPatchEditor:
                 str(exc)
             ) from exc
 
+    # Purpose: Read file for the change-set workflow.
     def read_file(
         self,
         path: str,
@@ -109,6 +118,7 @@ class RepoPilotPatchEditor:
             errors="ignore",
         )
 
+    # Purpose: Update file for the change-set workflow.
     def update_file(
         self,
         *,
@@ -157,6 +167,7 @@ class RepoPilotPatchEditor:
             self.operations_rejected += 1
             raise
 
+    # Purpose: Create file for the change-set workflow.
     def create_file(
         self,
         *,
@@ -219,6 +230,7 @@ class RepoPilotPatchEditor:
             self.operations_rejected += 1
             raise
 
+    # Purpose: Delete file for the change-set workflow.
     def delete_file(
         self,
         *,
@@ -230,6 +242,7 @@ class RepoPilotPatchEditor:
             "Deleting files is disabled in Step 6"
         )
 
+    # Purpose: Handle rename file for the change-set workflow.
     def rename_file(
         self,
         *,

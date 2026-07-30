@@ -1,3 +1,5 @@
+# Module purpose: Define workspaces HTTP API routes.
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas.workspace import (
@@ -21,6 +23,7 @@ router = APIRouter(
 )
 
 
+# Purpose: Clone repository for the HTTP API workflow.
 @router.post(
     "/clone",
     response_model=WorkspaceResponse,

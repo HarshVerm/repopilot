@@ -1,9 +1,12 @@
+# Module purpose: Define validated changes API payload schemas.
+
 from pydantic import (
     BaseModel,
     Field,
 )
 
 
+# Purpose: Validate and represent file change data.
 class FileChange(BaseModel):
     path: str = Field(
         min_length=1,
@@ -19,6 +22,7 @@ class FileChange(BaseModel):
     )
 
 
+# Purpose: Validate and represent coder output data.
 class CoderOutput(BaseModel):
     summary: str = Field(
         min_length=1,
@@ -40,6 +44,7 @@ class CoderOutput(BaseModel):
     )
 
 
+# Purpose: Validate and represent change set file response data.
 class ChangeSetFileResponse(BaseModel):
     path: str
     before_sha256: str
@@ -48,6 +53,7 @@ class ChangeSetFileResponse(BaseModel):
     lines_deleted: int
 
 
+# Purpose: Validate and represent implement plan response data.
 class ImplementPlanResponse(BaseModel):
     change_set_id: str
     plan_id: str
@@ -62,6 +68,7 @@ class ImplementPlanResponse(BaseModel):
     revision_reason: str | None = None
 
 
+# Purpose: Validate and represent change set diff response data.
 class ChangeSetDiffResponse(BaseModel):
     change_set_id: str
     plan_id: str

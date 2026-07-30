@@ -1,3 +1,5 @@
+"""Build a diverse, token-bounded code context pack for AI agents."""
+
 from app.core.config import settings
 from app.services.chunking.tokenizer import (
     count_tokens,
@@ -13,6 +15,7 @@ MAX_CHUNKS_PER_FILE = 3
 def estimate_context_chunk_tokens(
     candidate: RetrievalCandidate,
 ) -> int:
+    """Estimate the prompt cost of a chunk including source metadata."""
     metadata = (
         f"{candidate.file_path}\n"
         f"{candidate.symbol_name or ''}\n"
@@ -31,6 +34,7 @@ def apply_file_diversity(
     top_k: int,
     max_chunks_per_file: int = MAX_CHUNKS_PER_FILE,
 ) -> list[RetrievalCandidate]:
+    """Select top results without allowing one file to dominate context."""
     selected: list[RetrievalCandidate] = []
     file_counts: dict[str, int] = {}
 
@@ -59,6 +63,7 @@ def build_context_pack(
     max_tokens: int = settings.max_context_tokens,
     max_chunks_per_file: int = MAX_CHUNKS_PER_FILE,
 ) -> dict:
+    """Group ranked chunks by file while respecting the prompt token limit."""
     files: dict[str, dict] = {}
     file_counts: dict[str, int] = {}
     estimated_tokens = count_tokens(query)

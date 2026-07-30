@@ -1,3 +1,5 @@
+# Module purpose: Expose the planning package.
+
 from app.services.planning.service import (
     PlanStateError,
     PlanValidationError,

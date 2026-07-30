@@ -1,3 +1,5 @@
+# Module purpose: Implement logging behavior for the observability domain.
+
 import json
 import logging
 import sys
@@ -22,6 +24,7 @@ logger = logging.getLogger(
 class TaskLogFormatter(logging.Formatter):
     """Render task lifecycle logs as safe, searchable JSON lines."""
 
+    # Purpose: Format observability for the observability workflow.
     def format(
         self,
         record: logging.LogRecord,
@@ -95,6 +98,7 @@ def configure_task_logging(
     logger.addHandler(handler)
 
 
+# Purpose: Log task event for the observability workflow.
 def log_task_event(
     event_type: str,
     **fields: Any,

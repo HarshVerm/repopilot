@@ -1,3 +1,5 @@
+# Module purpose: Define validated tasks API payload schemas.
+
 from typing import Any
 
 from pydantic import (
@@ -8,6 +10,7 @@ from pydantic import (
 from uuid import UUID
 
 
+# Purpose: Validate and represent create task request data.
 class CreateTaskRequest(BaseModel):
     repository_id: UUID | None = None
     owner: str | None = Field(
@@ -30,6 +33,7 @@ class CreateTaskRequest(BaseModel):
         max_length=10_000,
     )
 
+    # Purpose: Validate repository reference for the task lifecycle workflow.
     @model_validator(mode="after")
     def validate_repository_reference(
         self,
@@ -43,6 +47,7 @@ class CreateTaskRequest(BaseModel):
         return self
 
 
+# Purpose: Validate and represent task response data.
 class TaskResponse(BaseModel):
     task_id: str
     repository: dict[str, str]
@@ -78,10 +83,12 @@ class TaskResponse(BaseModel):
     metrics: dict[str, Any] | None = None
 
 
+# Purpose: Validate and represent task list response data.
 class TaskListResponse(BaseModel):
     tasks: list[TaskResponse]
 
 
+# Purpose: Validate and represent task timeline event response data.
 class TaskTimelineEventResponse(BaseModel):
     event_id: str
     task_id: str
@@ -96,21 +103,25 @@ class TaskTimelineEventResponse(BaseModel):
     created_at: str | None
 
 
+# Purpose: Validate and represent task timeline response data.
 class TaskTimelineResponse(BaseModel):
     task_id: str
     events: list[TaskTimelineEventResponse]
 
 
+# Purpose: Validate and represent task metrics response data.
 class TaskMetricsResponse(BaseModel):
     task_id: str
     metrics: dict[str, Any]
 
 
+# Purpose: Validate and represent cancel task response data.
 class CancelTaskResponse(BaseModel):
     task_id: str
     status: str
     cancel_requested: bool
 
 
+# Purpose: Validate and represent reconcile task response data.
 class ReconcileTaskResponse(BaseModel):
     task: TaskResponse

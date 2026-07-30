@@ -1,3 +1,5 @@
+# Module purpose: Implement session behavior for the database domain.
+
 import sys
 
 from sqlalchemy.pool import NullPool
@@ -10,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import settings
 
 
+# Purpose: Handle engine options for the database workflow.
 def engine_options() -> dict:
     if "pytest" in sys.modules:
         return {
@@ -39,6 +42,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
+# Purpose: Return db for the database workflow.
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session

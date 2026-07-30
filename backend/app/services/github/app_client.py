@@ -1,3 +1,5 @@
+# Module purpose: Implement app client behavior for the GitHub integration domain.
+
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
@@ -8,10 +10,12 @@ from jwt.exceptions import PyJWTError
 from app.core.config import settings
 
 
+# Purpose: Signal git hub app configuration failures.
 class GitHubAppConfigurationError(RuntimeError):
     pass
 
 
+# Purpose: Handle missing github app settings for the GitHub integration workflow.
 def missing_github_app_settings() -> list[str]:
     private_key_configured = bool(
         settings.github_app_private_key
@@ -31,9 +35,11 @@ def missing_github_app_settings() -> list[str]:
     ]
 
 
+# Purpose: Provide the git hub app client integration boundary.
 class GitHubAppClient:
     base_url = "https://api.github.com"
 
+    # Purpose: Handle private key for the GitHub integration workflow.
     def private_key(self) -> str:
         if settings.github_app_private_key_path:
             try:
@@ -59,6 +65,7 @@ class GitHubAppClient:
             )
         return private_key
 
+    # Purpose: Handle app jwt for the GitHub integration workflow.
     def app_jwt(self) -> str:
         missing_settings = [
             name
@@ -97,6 +104,7 @@ class GitHubAppClient:
                 "GitHub App private key could not sign a JWT"
             ) from exc
 
+    # Purpose: Handle headers for the GitHub integration workflow.
     def headers(self, token: str) -> dict[str, str]:
         return {
             "Accept": "application/vnd.github+json",
@@ -104,6 +112,7 @@ class GitHubAppClient:
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
+    # Purpose: Handle app request for the GitHub integration workflow.
     async def app_request(
         self,
         method: str,
@@ -124,6 +133,7 @@ class GitHubAppClient:
             response.raise_for_status()
             return response
 
+    # Purpose: Return installation for the GitHub integration workflow.
     async def get_installation(
         self,
         github_installation_id: int,
@@ -134,6 +144,7 @@ class GitHubAppClient:
         )
         return response.json()
 
+    # Purpose: Create installation token for the GitHub integration workflow.
     async def create_installation_token(
         self,
         github_installation_id: int,
@@ -149,6 +160,7 @@ class GitHubAppClient:
             )
         return token
 
+    # Purpose: Handle installation request for the GitHub integration workflow.
     async def installation_request(
         self,
         *,
@@ -176,6 +188,7 @@ class GitHubAppClient:
             response.raise_for_status()
             return response
 
+    # Purpose: List installation repositories for the GitHub integration workflow.
     async def list_installation_repositories(
         self,
         github_installation_id: int,
@@ -194,6 +207,7 @@ class GitHubAppClient:
         )
         return response.json()
 
+    # Purpose: Return repository for the GitHub integration workflow.
     async def get_repository(
         self,
         github_installation_id: int,
@@ -207,6 +221,7 @@ class GitHubAppClient:
         )
         return response.json()
 
+    # Purpose: List issues for the GitHub integration workflow.
     async def list_issues(
         self,
         github_installation_id: int,
@@ -231,6 +246,7 @@ class GitHubAppClient:
         )
         return list(response.json())
 
+    # Purpose: Return issue for the GitHub integration workflow.
     async def get_issue(
         self,
         github_installation_id: int,
@@ -248,6 +264,7 @@ class GitHubAppClient:
         )
         return response.json()
 
+    # Purpose: Return branch head sha for the GitHub integration workflow.
     async def get_branch_head_sha(
         self,
         github_installation_id: int,
@@ -269,6 +286,7 @@ class GitHubAppClient:
 github_app_client = GitHubAppClient()
 
 
+# Purpose: Handle repository path for the GitHub integration workflow.
 def repository_path(owner: str, repo: str) -> str:
     return (
         f"/repos/{quote(owner, safe='')}/"

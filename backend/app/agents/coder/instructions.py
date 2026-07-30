@@ -1,3 +1,5 @@
+# Module purpose: Define trusted instructions for the AI agent.
+
 CODER_AGENT_NAME = "RepoPilot Coder"
 
 CODER_INSTRUCTIONS = """
@@ -27,6 +29,14 @@ You MUST NOT:
 
 Preserve existing architecture and style.
 Do not make unrelated refactors or formatting-only rewrites.
+
+When authenticated final-review feedback is provided, it is a trusted human
+decision and MUST be addressed in the new revision. It may refine or replace
+implementation details inside the already approved file scope. It cannot add
+files, permissions, dependencies, or operations outside that scope. If the
+feedback cannot be satisfied within the approved scope, stop and return
+needs_plan_revision=true with a concrete revision_reason. Never report a
+successful revision without making a material change to the reviewed diff.
 
 If the approved plan cannot be completed using only the approved files, stop and
 return needs_plan_revision=true with a concrete revision_reason.

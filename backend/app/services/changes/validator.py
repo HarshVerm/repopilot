@@ -1,3 +1,5 @@
+# Module purpose: Implement validator behavior for the change-set domain.
+
 from pathlib import Path
 
 from app.core.config import settings
@@ -10,14 +12,17 @@ from app.services.changes.policy import (
 )
 
 
+# Purpose: Signal unauthorized file change failures.
 class UnauthorizedFileChangeError(ValueError):
     pass
 
 
+# Purpose: Signal diff limit exceeded failures.
 class DiffLimitExceededError(ValueError):
     pass
 
 
+# Purpose: Validate actual changes for the change-set workflow.
 def validate_actual_changes(
     *,
     repository_path: Path,

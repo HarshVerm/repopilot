@@ -1,3 +1,5 @@
+# Module purpose: Implement reports behavior for the evaluation domain.
+
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +21,7 @@ from app.services.hardening.limits import (
 )
 
 
+# Purpose: Build report payload for the evaluation workflow.
 def build_report_payload(
     *,
     run_id: str,
@@ -75,6 +78,7 @@ def build_report_payload(
     }
 
 
+# Purpose: Write reports for the evaluation workflow.
 def write_reports(
     *,
     run_id: str,
@@ -110,6 +114,7 @@ def write_reports(
     }
 
 
+# Purpose: Handle markdown report for the evaluation workflow.
 def markdown_report(
     payload: dict[str, Any],
 ) -> str:
@@ -161,6 +166,7 @@ def markdown_report(
     return "\n".join(lines) + "\n"
 
 
+# Purpose: Handle production readiness report for the evaluation workflow.
 def production_readiness_report(
     *,
     evaluation_run_id: str,
@@ -229,6 +235,7 @@ def production_readiness_report(
     }
 
 
+# Purpose: Handle percent for the evaluation workflow.
 def percent(
     value: float,
 ) -> str:

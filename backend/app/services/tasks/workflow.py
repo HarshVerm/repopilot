@@ -1,3 +1,5 @@
+# Module purpose: Implement workflow behavior for the task lifecycle domain.
+
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,6 +64,7 @@ from app.services.workspace.manager import (
 class TaskWorkflowService:
     """Runs the existing agent services in the Standard autonomy order."""
 
+    # Purpose: Run task for the task lifecycle workflow.
     async def run_task(self, task_id: uuid.UUID) -> None:
         async with AsyncSessionLocal() as db:
             lock = TaskOperationLockService()
@@ -126,6 +129,7 @@ class TaskWorkflowService:
                         db=db,
                     )
 
+    # Purpose: Run task lifecycle for the task lifecycle workflow.
     async def _run(
         self,
         *,
@@ -227,6 +231,7 @@ class TaskWorkflowService:
             db=db,
             event_type="indexing.started",
         )
+        # Build the file/symbol index that the chunking stage reads.
         index_result = await index_repository(
             workspace_id=workspace_id,
             repository_path=repository_path,
@@ -240,6 +245,7 @@ class TaskWorkflowService:
             metadata=index_result,
         )
 
+        # Create per-task chunks and vectors for hybrid RAG retrieval.
         embedding_client = OpenAIEmbeddingClient()
         await build_retrieval_index(
             workspace_id=workspace_id,
@@ -255,6 +261,7 @@ class TaskWorkflowService:
             event_type="retrieval.started",
         )
         issue = task_issue_snapshot(task)
+        # Retrieve issue-relevant code and package it for the AI agents.
         context = await hybrid_search(
             workspace_id=workspace_id,
             query=issue_query_text(issue),
@@ -397,11 +404,13 @@ class TaskWorkflowService:
             task_id=task_id,
         )
 
+    # Purpose: Run revision for the task lifecycle workflow.
     async def run_revision(
         self,
         *,
         task_id: uuid.UUID,
         previous_change_set_id: uuid.UUID,
+        review_feedback: str,
     ) -> None:
         async with AsyncSessionLocal() as db:
             try:
@@ -462,6 +471,7 @@ class TaskWorkflowService:
                     previous_change_set_id=(
                         previous_change_set_id
                     ),
+                    review_feedback=review_feedback,
                 )
                 if change_set.status != "generated":
                     log_task_event(
@@ -555,6 +565,7 @@ class TaskWorkflowService:
                     db=db,
                 )
 
+    # Purpose: Check cancel for the task lifecycle workflow.
     async def _check_cancel(
         self,
         task_id: uuid.UUID,
@@ -567,6 +578,7 @@ class TaskWorkflowService:
         if task.cancel_requested or task.status == CANCELLED:
             raise WorkflowCancelled()
 
+    # Purpose: Record failure for the task lifecycle workflow.
     async def _record_failure(
         self,
         *,
@@ -633,23 +645,28 @@ class TaskWorkflowService:
             )
 
 
+# Purpose: Encapsulate workflow cancelled behavior for the task lifecycle domain.
 class WorkflowCancelled(RuntimeError):
     pass
 
 
+# Purpose: Run task background for the task lifecycle workflow.
 async def run_task_background(task_id: str) -> None:
     await TaskWorkflowService().run_task(
         uuid.UUID(task_id)
     )
 
 
+# Purpose: Run revision background for the task lifecycle workflow.
 async def run_revision_background(
     task_id: str,
     previous_change_set_id: str,
+    review_feedback: str,
 ) -> None:
     await TaskWorkflowService().run_revision(
         task_id=uuid.UUID(task_id),
         previous_change_set_id=uuid.UUID(
             previous_change_set_id
         ),
+        review_feedback=review_feedback,
     )

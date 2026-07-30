@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the evaluations view interface.
+
 import { useMutation } from "@tanstack/react-query";
 import { Award, Play } from "lucide-react";
 import { useState } from "react";
@@ -8,6 +10,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { runEvaluation } from "@/lib/api/evaluations";
 
+/** Purpose: Render the evaluations view interface. */
 export function EvaluationsView() {
   const [suite, setSuite] = useState("");
   const [maxTasks, setMaxTasks] = useState("");

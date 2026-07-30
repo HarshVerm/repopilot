@@ -2,7 +2,9 @@
 
 RepoPilot uses GitHub OAuth for user identity and GitHub App installations for
 repository access. It does not ask users for personal access tokens and does
-not persist installation access tokens.
+not persist installation access tokens. GitHub App user access and refresh
+tokens are encrypted at rest so pull requests can be attributed to the
+signed-in user.
 
 Create a **GitHub App**, not a standalone OAuth App. GitHub Apps use the OAuth
 web application flow for user sign-in while also providing fine-grained,
@@ -73,14 +75,17 @@ GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVA
 GITHUB_APP_CLIENT_ID=Iv1.example
 GITHUB_APP_CLIENT_SECRET=example
 GITHUB_APP_SLUG=repopilot-development
+GITHUB_USER_TOKEN_ENCRYPTION_SECRET=replace-with-an-independent-32-character-secret
 
 DATABASE_URL=postgresql+asyncpg://repopilot:repopilot@localhost:5432/repopilot
 OPENAI_API_KEY=
 ```
 
-Use an actual random value for `SESSION_SECRET`. Production configuration
-forces secure cookies, disables the unauthenticated compatibility API, and
-rejects the development session secret.
+Use independent random values for `SESSION_SECRET` and
+`GITHUB_USER_TOKEN_ENCRYPTION_SECRET`. Production configuration forces secure
+cookies, disables the unauthenticated compatibility API, and rejects missing
+or weak secrets. Keep the token-encryption secret stable across deployments;
+changing it requires users to reconnect GitHub.
 
 The frontend uses:
 
@@ -123,18 +128,24 @@ confirms that the signed-in user can access that installation.
 
 ## 5. Token and publication behavior
 
-The OAuth user token exists only while the callback fetches identity and
-installation membership; RepoPilot does not persist it. An app JWT and a fresh,
-short-lived installation token are generated server-side for repository
-listing, issue retrieval, cloning, and publication. Tokens are passed to Git
-through a temporary owner-only `GIT_ASKPASS` script and are redacted from
-errors.
+RepoPilot encrypts the GitHub App user access token and optional rotating
+refresh token before storing them. Expiring user tokens are refreshed
+server-side using GitHub's rotation flow. The plaintext values are never
+returned to the browser or written to logs. Existing users must open
+**Settings → Pull request attribution → Connect User** once after upgrading.
+
+An app JWT and a fresh, short-lived installation token are generated
+server-side for repository listing, issue retrieval, cloning, and branch
+pushes. Installation tokens are not persisted. Tokens passed to Git use a
+temporary owner-only `GIT_ASKPASS` script and are redacted from errors.
 
 After the exact final diff is approved, deterministic backend publication code
 revalidates the installation, repository permission, diff hash, and base
 commit. It then creates a non-default RepoPilot branch, commits and pushes the
-approved files, and opens a pull request. It never force-pushes, pushes the
-default branch, or merges the pull request.
+approved files with the installation token, and opens the pull request with
+the initiating user's access token. GitHub therefore displays the user's login
+as the pull-request author instead of the App bot. RepoPilot never force-pushes,
+pushes the default branch, or merges the pull request.
 
 If an installation is removed, suspended, or loses repository access, a later
 login, repository sync, or publication check marks the stored access state and

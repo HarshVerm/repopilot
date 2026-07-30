@@ -1,3 +1,5 @@
+"""Retrieve exact textual matches with PostgreSQL full-text search."""
+
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,7 @@ async def retrieve_lexical(
     query: str,
     limit: int,
 ) -> list[RetrievalCandidate]:
+    """Rank workspace chunks using their weighted PostgreSQL search vector."""
     stripped_query = query.strip()
 
     if not stripped_query or limit <= 0:

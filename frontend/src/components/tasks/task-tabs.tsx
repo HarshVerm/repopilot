@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the task tabs interface.
+
 import type { TaskTab } from "@/types/task";
 
 const tabs: Array<{ id: TaskTab; label: string }> = [
@@ -12,6 +14,7 @@ const tabs: Array<{ id: TaskTab; label: string }> = [
   { id: "metrics", label: "Metrics" },
 ];
 
+/** Purpose: Render the task tabs interface. */
 export function TaskTabs({
   activeTab,
   onTabChange,
@@ -41,6 +44,7 @@ export function TaskTabs({
   );
 }
 
+/** Purpose: Normalize task tab for this frontend workflow. */
 export function normalizeTaskTab(value: string | null): TaskTab {
   return tabs.some((tab) => tab.id === value) ? (value as TaskTab) : "overview";
 }

@@ -1,13 +1,17 @@
+# Module purpose: Implement validation behavior for the application hardening domain.
+
 import json
 from typing import Any
 
 from app.core.config import settings
 
 
+# Purpose: Signal input limit failures.
 class InputLimitError(ValueError):
     pass
 
 
+# Purpose: Validate bounded text for the application hardening workflow.
 def validate_bounded_text(
     value: str | None,
     *,
@@ -32,6 +36,7 @@ def validate_bounded_text(
     return text
 
 
+# Purpose: Validate issue payload for the application hardening workflow.
 def validate_issue_payload(
     *,
     title: str | None,
@@ -50,6 +55,7 @@ def validate_issue_payload(
     )
 
 
+# Purpose: Validate retrieval request for the application hardening workflow.
 def validate_retrieval_request(
     *,
     query: str,
@@ -67,6 +73,7 @@ def validate_retrieval_request(
         )
 
 
+# Purpose: Validate task event metadata for the application hardening workflow.
 def validate_task_event_metadata(
     metadata: dict[str, Any] | None,
 ) -> dict[str, Any] | None:

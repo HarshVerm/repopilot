@@ -1,6 +1,9 @@
+# Module purpose: Implement hashing behavior for the change-set domain.
+
 import hashlib
 
 
+# Purpose: Handle sha256 text for the change-set workflow.
 def sha256_text(
     value: str,
 ) -> str:
@@ -9,6 +12,7 @@ def sha256_text(
     ).hexdigest()
 
 
+# Purpose: Normalize diff for the change-set workflow.
 def normalize_diff(
     diff: str | None,
 ) -> str:
@@ -20,6 +24,7 @@ def normalize_diff(
     ).strip()
 
 
+# Purpose: Handle diff hash for the change-set workflow.
 def diff_hash(
     diff: str | None,
 ) -> str:

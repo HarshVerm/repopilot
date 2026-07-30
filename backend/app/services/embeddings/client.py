@@ -1,3 +1,5 @@
+"""Generate validated vector embeddings for repository and query text."""
+
 from typing import Any, Protocol
 
 from openai import AsyncOpenAI
@@ -10,14 +12,16 @@ from app.services.hardening.retries import (
 
 
 class EmbeddingConfigurationError(RuntimeError):
-    pass
+    """Raised when the embedding provider cannot be configured safely."""
 
 
 class EmbeddingDimensionError(RuntimeError):
-    pass
+    """Raised when a provider returns a vector with the wrong dimensions."""
 
 
 class EmbeddingClient(Protocol):
+    """Define the provider interface consumed by indexing and retrieval."""
+
     model: str
     dimensions: int
     batch_size: int
@@ -26,6 +30,7 @@ class EmbeddingClient(Protocol):
         self,
         texts: list[str],
     ) -> list[list[float]]:
+        """Return one embedding vector for every input string."""
         ...
 
 
@@ -33,6 +38,7 @@ def validate_embedding_dimensions(
     embedding: list[float],
     expected_dimensions: int,
 ) -> None:
+    """Reject vectors that are incompatible with the pgvector column."""
     if len(embedding) != expected_dimensions:
         raise EmbeddingDimensionError(
             "Embedding dimension mismatch: "
@@ -42,6 +48,8 @@ def validate_embedding_dimensions(
 
 
 class OpenAIEmbeddingClient:
+    """Batch and retry embedding requests made through the OpenAI client."""
+
     def __init__(
         self,
         *,
@@ -51,6 +59,7 @@ class OpenAIEmbeddingClient:
         batch_size: int = settings.embedding_batch_size,
         openai_client: Any | None = None,
     ) -> None:
+        """Store provider settings and an optional injected test client."""
         self.api_key = api_key
         self.model = model
         self.dimensions = dimensions
@@ -58,6 +67,7 @@ class OpenAIEmbeddingClient:
         self._client = openai_client
 
     def get_client(self):
+        """Lazily create and cache the configured asynchronous API client."""
         if self._client is not None:
             return self._client
 
@@ -78,6 +88,7 @@ class OpenAIEmbeddingClient:
         self,
         texts: list[str],
     ) -> list[list[float]]:
+        """Embed input texts in stable order using bounded provider batches."""
         if not texts:
             return []
 

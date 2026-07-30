@@ -1,3 +1,5 @@
+"""Persist code chunks for structural, full-text, and vector retrieval."""
+
 import uuid
 
 from pgvector.sqlalchemy import Vector
@@ -34,6 +36,8 @@ setweight(to_tsvector('simple', coalesce(content, '')), 'C')
 
 
 class CodeChunk(Base):
+    """Store one searchable source window and its retrieval metadata."""
+
     __tablename__ = "code_chunks"
     __table_args__ = (
         Index(

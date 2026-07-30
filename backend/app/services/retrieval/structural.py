@@ -1,3 +1,5 @@
+"""Retrieve symbol chunks whose names or file paths match query terms."""
+
 import re
 
 from sqlalchemy import or_, select
@@ -15,6 +17,7 @@ MAX_STRUCTURAL_TERMS = 8
 def escape_like_query(
     query: str,
 ) -> str:
+    """Escape user-derived text before using it in an SQL LIKE pattern."""
     return (
         query.replace("\\", "\\\\")
         .replace("%", "\\%")
@@ -25,6 +28,7 @@ def escape_like_query(
 def extract_query_terms(
     query: str,
 ) -> list[str]:
+    """Extract a bounded, unique list of identifier-like search terms."""
     terms: list[str] = []
     seen: set[str] = set()
 
@@ -51,6 +55,7 @@ def structural_score(
     chunk: CodeChunk,
     terms: list[str],
 ) -> int:
+    """Prefer exact symbol names, then partial symbols, then file paths."""
     symbol_name = (
         chunk.symbol_name or ""
     ).lower()
@@ -87,6 +92,7 @@ async def retrieve_structural(
     query: str,
     limit: int,
 ) -> list[RetrievalCandidate]:
+    """Find and rank symbol chunks using identifiers from the issue query."""
     terms = extract_query_terms(
         query.strip()
     )

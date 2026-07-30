@@ -1,10 +1,14 @@
+# Module purpose: Implement input behavior for the planning domain.
+
 from app.core.config import settings
 
 
+# Purpose: Signal planner input failures.
 class PlannerInputError(ValueError):
     pass
 
 
+# Purpose: Normalize issue body for the planning workflow.
 def normalize_issue_body(
     issue: dict,
 ) -> str:
@@ -16,6 +20,7 @@ def normalize_issue_body(
     return str(body)
 
 
+# Purpose: Build planner input for the planning workflow.
 def build_planner_input(
     *,
     owner: str,

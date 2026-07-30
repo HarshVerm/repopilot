@@ -1,3 +1,5 @@
+# Module purpose: Implement runner behavior for the evaluation domain.
+
 import argparse
 import asyncio
 import subprocess
@@ -90,11 +92,14 @@ from app.services.tasks.state_machine import (
 )
 
 
+# Purpose: Signal evaluation run failures.
 class EvaluationRunError(RuntimeError):
     pass
 
 
+# Purpose: Encapsulate evaluation runner behavior for the evaluation domain.
 class EvaluationRunner:
+    # Purpose: Initialize evaluation runner state and dependencies.
     def __init__(
         self,
         *,
@@ -110,6 +115,7 @@ class EvaluationRunner:
             hidden_test_runner or HiddenTestRunner()
         )
 
+    # Purpose: Run evaluation for the evaluation workflow.
     async def run(
         self,
         *,
@@ -276,6 +282,7 @@ class EvaluationRunner:
             "paths": paths,
         }
 
+    # Purpose: Create run for the evaluation workflow.
     async def create_run(
         self,
         *,
@@ -310,6 +317,7 @@ class EvaluationRunner:
         )
         return evaluation_run
 
+    # Purpose: Run live task for the evaluation workflow.
     async def run_live_task(
         self,
         *,
@@ -619,6 +627,7 @@ class EvaluationRunner:
         )
         return result
 
+    # Purpose: Handle complete run for the evaluation workflow.
     async def complete_run(
         self,
         *,
@@ -676,6 +685,7 @@ class EvaluationRunner:
         await db.commit()
 
 
+# Purpose: Handle dry run results for the evaluation workflow.
 def dry_run_results(
     suite: EvaluationSuite,
 ) -> list[EvaluationTaskResultData]:
@@ -691,6 +701,7 @@ def dry_run_results(
     ]
 
 
+# Purpose: Persist task result for the evaluation workflow.
 async def persist_task_result(
     *,
     evaluation_run_id: uuid.UUID,
@@ -754,6 +765,7 @@ async def persist_task_result(
     return record
 
 
+# Purpose: Load persisted results for the evaluation workflow.
 async def load_persisted_results(
     *,
     evaluation_run_id: uuid.UUID,
@@ -824,6 +836,7 @@ async def load_persisted_results(
     ]
 
 
+# Purpose: Handle fixture files for the evaluation workflow.
 def fixture_files(
     repository_path: Path,
 ) -> set[str]:
@@ -845,6 +858,7 @@ def fixture_files(
     }
 
 
+# Purpose: Handle current git sha for the evaluation workflow.
 def current_git_sha() -> str | None:
     try:
         result = subprocess.run(
@@ -866,6 +880,7 @@ def current_git_sha() -> str | None:
     return result.stdout.strip()
 
 
+# Purpose: Issue number for task for the evaluation workflow.
 def issue_number_for_task(
     task: EvaluationTask,
 ) -> int:
@@ -878,6 +893,7 @@ def issue_number_for_task(
     ) or 1
 
 
+# Purpose: Build arg parser for the evaluation workflow.
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run RepoPilot evaluation suites"
@@ -923,6 +939,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# Purpose: Handle async main for the evaluation workflow.
 async def async_main(
     argv: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -943,6 +960,7 @@ async def async_main(
     )
 
 
+# Purpose: Handle main for the evaluation workflow.
 def main(
     argv: list[str] | None = None,
 ) -> None:

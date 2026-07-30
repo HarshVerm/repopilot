@@ -1,3 +1,5 @@
+"""Retrieve conceptually similar chunks with pgvector cosine distance."""
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +22,7 @@ async def retrieve_semantic(
     limit: int,
     embedding_client: EmbeddingClient,
 ) -> list[RetrievalCandidate]:
+    """Embed the issue query and return its nearest workspace code chunks."""
     stripped_query = query.strip()
 
     if not stripped_query or limit <= 0:

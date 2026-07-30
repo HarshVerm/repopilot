@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the tasks dashboard interface.
+
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -16,6 +18,7 @@ import { TaskTable } from "./task-table";
 
 type StatusFilter = "All" | "Active" | "Waiting for Me" | "Failed" | "Completed";
 
+/** Purpose: Filter by status for this frontend workflow. */
 function filterByStatus(task: TaskResponse, status: StatusFilter) {
   if (status === "All") return true;
   if (status === "Active") return isActiveTask(task);
@@ -25,6 +28,7 @@ function filterByStatus(task: TaskResponse, status: StatusFilter) {
   return true;
 }
 
+/** Purpose: Render the stat card interface. */
 function StatCard({
   label,
   value,
@@ -61,6 +65,7 @@ function StatCard({
   );
 }
 
+/** Purpose: Render the tasks dashboard interface. */
 export function TasksDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");

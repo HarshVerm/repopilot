@@ -1,5 +1,7 @@
 "use client";
 
+// Module purpose: Render and coordinate the app shell interface.
+
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +14,7 @@ import { isApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 
+/** Purpose: Render the app shell interface. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();

@@ -1,3 +1,5 @@
+# Module purpose: Implement agent behavior for the planning domain.
+
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -63,6 +65,7 @@ missing context. Do not invent a confident root cause.
 """
 
 
+# Purpose: Represent planner run result data.
 @dataclass(frozen=True)
 class PlannerRunResult:
     output: PlannerOutput
@@ -72,9 +75,11 @@ class PlannerRunResult:
     total_tokens: int | None
 
 
+# Purpose: Define the interface required from planner runner implementations.
 class PlannerRunner(Protocol):
     model: str
 
+    # Purpose: Run planning for the planning workflow.
     async def run(
         self,
         planner_input: str,
@@ -84,6 +89,7 @@ class PlannerRunner(Protocol):
         ...
 
 
+# Purpose: Create planner agent for the planning workflow.
 def create_planner_agent() -> Agent:
     return Agent(
         name=PLANNER_AGENT_NAME,
@@ -98,6 +104,7 @@ def create_planner_agent() -> Agent:
     )
 
 
+# Purpose: Extract usage for the planning workflow.
 def extract_usage(
     raw_responses: list[Any],
 ) -> tuple[int | None, int | None, int | None]:
@@ -156,15 +163,18 @@ def extract_usage(
     )
 
 
+# Purpose: Encapsulate agents planner runner behavior for the planning domain.
 class AgentsPlannerRunner:
     model = settings.planner_model
 
+    # Purpose: Initialize agents planner runner state and dependencies.
     def __init__(
         self,
         agent: Agent | None = None,
     ) -> None:
         self.agent = agent or create_planner_agent()
 
+    # Purpose: Run planning for the planning workflow.
     async def run(
         self,
         planner_input: str,

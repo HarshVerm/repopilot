@@ -1,3 +1,5 @@
+"""Merge independent retriever rankings with Reciprocal Rank Fusion."""
+
 from dataclasses import replace
 
 from app.services.retrieval.candidates import (
@@ -14,6 +16,7 @@ def reciprocal_rank_fusion(
     *,
     k: int = RRF_K,
 ) -> list[RetrievalCandidate]:
+    """Fuse ranked lists without comparing their incompatible raw scores."""
     scores = {}
     candidates = {}
     matched_by = {}

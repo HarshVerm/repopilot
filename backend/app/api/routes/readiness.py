@@ -1,3 +1,5 @@
+# Module purpose: Define readiness HTTP API routes.
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -20,6 +22,7 @@ router = APIRouter(
 )
 
 
+# Purpose: Report current HTTP API readiness.
 @router.get(
     "/ready",
     response_model=ReadinessResponse,

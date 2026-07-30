@@ -1,3 +1,5 @@
+# Module purpose: Expose the chunking package.
+
 from app.services.chunking.chunker import (
     ChunkDraft,
     UnsafeRepositoryPathError,

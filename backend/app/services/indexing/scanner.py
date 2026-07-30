@@ -1,3 +1,5 @@
+"""Discover safe, supported, Git-tracked files for repository indexing."""
+
 import hashlib
 import subprocess
 from dataclasses import dataclass
@@ -23,6 +25,8 @@ IGNORED_DIRECTORIES = {
 
 @dataclass
 class SourceFile:
+    """Describe a repository source file accepted by the scanner."""
+
     relative_path: str
     absolute_path: Path
     language: str
@@ -30,10 +34,11 @@ class SourceFile:
 
 
 class RepositoryLimitError(RuntimeError):
-    pass
+    """Raised when a repository exceeds a configured indexing limit."""
 
 
 def calculate_sha256(content: bytes) -> str:
+    """Return a stable content digest used to identify file revisions."""
     return hashlib.sha256(content).hexdigest()
 
 
@@ -41,6 +46,7 @@ def is_relative_to(
     path: Path,
     parent: Path,
 ) -> bool:
+    """Check that a resolved path remains inside an expected parent."""
     try:
         path.relative_to(parent)
     except ValueError:
@@ -52,6 +58,7 @@ def is_relative_to(
 def has_ignored_directory(
     relative_path: Path,
 ) -> bool:
+    """Return whether a file is nested below a generated/vendor directory."""
     return any(
         part in IGNORED_DIRECTORIES
         for part in relative_path.parts[:-1]
@@ -61,6 +68,7 @@ def has_ignored_directory(
 def scan_repository(
     repository_path: Path,
 ) -> list[SourceFile]:
+    """List indexable tracked files while enforcing path and size limits."""
     repo_root = repository_path.resolve()
 
     result = subprocess.run(

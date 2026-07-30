@@ -1,3 +1,5 @@
+# Module purpose: Define persistent execution plan database models.
+
 import uuid
 from datetime import datetime
 
@@ -23,6 +25,7 @@ from sqlalchemy.orm import (
 from app.db.base import Base
 
 
+# Purpose: Persist execution plan records.
 class ExecutionPlan(Base):
     __tablename__ = "execution_plans"
 
