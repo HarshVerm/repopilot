@@ -59,9 +59,15 @@ assert_idle() {
 }
 assert_idle
 # Block new requests before checking again; existing in-flight requests can finish.
+cat > /etc/caddy/repopilot-maintenance.Caddyfile <<'CADDY'
+repopilot.35-255-102-56.sslip.io {
+    respond "RepoPilot deployment in progress. Please retry shortly." 503
+}
+CADDY
+caddy validate --config /etc/caddy/repopilot-maintenance.Caddyfile --adapter caddyfile
 cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.repopilot-normal
 maintenance=1
-printf '%s\n' 'repopilot.35-255-102-56.sslip.io { respond "RepoPilot deployment in progress. Please retry shortly." 503 }' > /etc/caddy/Caddyfile
+cp /etc/caddy/repopilot-maintenance.Caddyfile /etc/caddy/Caddyfile
 systemctl reload caddy
 sleep 3
 assert_idle
