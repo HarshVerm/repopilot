@@ -1,0 +1,47 @@
+name: Deploy RepoPilot
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: repopilot-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Configure deployment SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.REPOPILOT_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.REPOPILOT_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/repopilot
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Build and deploy the pushed commit
+        env:
+          DEPLOY_HOST: ${{ secrets.REPOPILOT_DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          git archive --format=tar "$GITHUB_SHA" | gzip | \
+            ssh -T -i ~/.ssh/repopilot -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+              -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+              "repopilot-ci@$DEPLOY_HOST" "deploy $GITHUB_SHA"
+      - name: Verify public HTTPS readiness
+        env:
+          SITE_URL: ${{ vars.REPOPILOT_SITE_URL }}
+        run: |
+          curl --fail --show-error --retry 5 --retry-all-errors --max-time 20 "$SITE_URL/ready"
+          curl --fail --show-error --max-time 20 --output /dev/null "$SITE_URL/login"
+      - name: Remove deployment key
+        if: always()
+        run: rm -f ~/.ssh/repopilot

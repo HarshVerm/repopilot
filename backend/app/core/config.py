@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     sandbox_root: Path = Path(
         "/tmp/repopilot-sandboxes"
     )
+    workspace_root: Path = Path(__file__).resolve().parents[2] / "workspaces"
     sandbox_cpu_limit: str = "2"
     sandbox_memory_limit: str = "2g"
     sandbox_pids_limit: int = 256

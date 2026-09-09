@@ -5,6 +5,8 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.config import settings
+
 from app.services.publishing.authentication import (
     GitHubCredentials,
 )
@@ -15,7 +17,7 @@ from app.services.publishing.git import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
-WORKSPACES_DIR = PROJECT_ROOT / "workspaces"
+WORKSPACES_DIR = settings.workspace_root
 
 
 # Purpose: Coordinate workspace operations.
