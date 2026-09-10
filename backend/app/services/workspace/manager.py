@@ -15,8 +15,6 @@ from app.services.publishing.git import (
     sanitize_error,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-
 WORKSPACES_DIR = settings.workspace_root
 
 

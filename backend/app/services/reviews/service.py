@@ -28,6 +28,7 @@ from app.services.changes.diff import (
     summarize_diff,
 )
 from app.services.changes.git import (
+    GitCommandError,
     get_base_commit_sha,
 )
 from app.services.changes.hashing import (
@@ -573,9 +574,15 @@ class ReviewService:
         expected_diff_hash: str | None,
         allow_diff_hash_backfill: bool,
     ) -> DiffSummary:
-        current_base = get_base_commit_sha(
-            repository_path
-        )
+        try:
+            current_base = get_base_commit_sha(
+                repository_path
+            )
+        except GitCommandError as exc:
+            raise ReviewStateError(
+                "The review workspace is unavailable. Restore the workspace "
+                "before approving this diff."
+            ) from exc
 
         if current_base != change_set.base_commit_sha:
             raise WorkspaceDriftError(

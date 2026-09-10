@@ -1,6 +1,5 @@
 # Module purpose: Define indexing HTTP API routes.
 
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -27,6 +26,7 @@ from app.schemas.indexing import (
 from app.services.indexing.indexer import (
     index_repository,
 )
+from app.services.workspace.manager import WORKSPACES_DIR
 from app.services.tasks.failures import (
     INDEXING_ERROR,
 )
@@ -50,16 +50,6 @@ router = APIRouter(
     tags=["indexing"],
 )
 
-
-PROJECT_ROOT = (
-    Path(__file__)
-    .resolve()
-    .parents[4]
-)
-
-WORKSPACES_DIR = (
-    PROJECT_ROOT / "workspaces"
-)
 
 MAX_SYMBOL_QUERY_LENGTH = 100
 MAX_SYMBOL_SEARCH_LIMIT = 50
